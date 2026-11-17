@@ -33,13 +33,13 @@ spec:
   chart:
     spec:
       chart: ./charts/quiz-service
-      reconcileStrategy: Revision   # a chart change in Git is picked up without a version bump
+      reconcileStrategy: Revision # a chart change in Git is picked up without a version bump
       sourceRef:
         kind: GitRepository
         name: quiz
   values:
     image:
       repository: ghcr.io/6-sem-musik-quiz/userservice
-      tag: 0-00000000-0 # {"$imagepolicy": "quiz:userservice:tag"}
+      tag: 5-8698b506-1794917283 # {"$imagepolicy": "quiz:userservice:tag"}
     envFromSecrets:
       - userservice-secrets
