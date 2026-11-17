@@ -61,3 +61,26 @@ kubectl port-forward svc/rabbitmq 15672:15672        # RabbitMQ UI on localhost:
 kubectl port-forward svc/userservice 8080:8080       # call one service directly
 kubectl get helmreleases                             # did Flux install everything?
 ```
+
+## Postgres in pgAdmin
+
+Postgres is not exposed outside the cluster, so open a tunnel first (Tailscale
+on, your quiz kubeconfig active). Keep the terminal open while you use pgAdmin.
+
+```bash
+kubectl -n quiz port-forward svc/postgresql 15432:5432
+```
+
+The local port is 15432 so it does not clash with a local docker-compose Postgres on 5432.
+Get the admin password:
+
+```bash
+kubectl -n quiz get secret postgresql-auth -o jsonpath="{.data.postgres-password}" | base64 -d
+```
+
+(On PowerShell without `base64`, use
+`[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((kubectl -n quiz get secret postgresql-auth -o jsonpath="{.data.postgres-password}")))`.)
+
+In pgAdmin choose Register > Server and fill in: host `localhost`, port `15432`, maintenance DB `postgres`,
+username `postgres`, and the password from above. Each service has its own database
+(`userservice`, `lobbyservice`, `gameservice`, `musicservice`, `statisticservice`).
