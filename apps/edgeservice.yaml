@@ -3,9 +3,6 @@
 # to http://edgeservice.quiz.svc.cluster.local:8080. YARP routes each path to
 # a private service, e.g. /api/users/* -> http://userservice:8080.
 # The routes live in the EdgeService repo (appsettings.json), not here.
-#
-# Not in apps/kustomization.yaml yet: the repo 6-sem-musik-quiz/EdgeService
-# and its first image must exist first.
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
