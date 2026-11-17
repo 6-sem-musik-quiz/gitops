@@ -44,6 +44,33 @@ No secret is in Git. The passwords are in OpenBao under `kv/quiz/*`.
 External Secrets Operator turns them into Kubernetes Secrets, and the
 services get them as environment variables, e.g. `ConnectionStrings__Default`.
 
+### Adding or changing a secret in OpenBao
+
+Everyone on the team has an OpenBao login (ask Asger for your first password).
+You can read, write and delete `kv/quiz/*`, except `kv/quiz/flux-deploy-key`.
+OpenBao is at `https://192.168.0.30:8200` (Tailscale on). Its CA is
+[`openbao-ca.crt`](openbao-ca.crt) in this repo.
+
+- **Web UI:** open `https://192.168.0.30:8200/ui`, choose method Username, then
+  Secrets → kv → quiz. Your browser warns about the certificate unless you
+  import `openbao-ca.crt`.
+- **CLI** ([install bao](https://openbao.org/docs/install/)), PowerShell:
+
+```powershell
+$env:BAO_ADDR = "https://192.168.0.30:8200"; $env:BAO_CACERT = "$PWD\openbao-ca.crt"
+bao login -method=userpass username=<you>
+bao write auth/userpass/users/<you>/password password=-   # first time: pick your own password, then press Ctrl-Z, Enter
+bao kv get kv/quiz/postgres
+bao kv patch kv/quiz/spotify client-id=... client-secret=...   # change or add one key
+```
+
+Use `kv patch` to change one key, not `kv put`: `put` replaces the whole secret
+and drops the other keys. A changed secret reaches the cluster within an hour
+(`refreshInterval: 1h`), and the pods only see it after a restart:
+`kubectl delete pod -l app.kubernetes.io/name=<service>`.
+Note that Postgres only reads its passwords on its very first start, so a new
+password in `kv/quiz/postgres` also needs an `ALTER USER` in psql.
+
 ## What the services must do
 
 - Listen on 8080 and answer `GET /health` (they do already).
