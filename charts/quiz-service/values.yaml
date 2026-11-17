@@ -1,0 +1,38 @@
+# Default values. Each HelmRelease in apps/ overrides what differs per service.
+
+image:
+  repository: ""        # e.g. ghcr.io/6-sem-musik-quiz/userservice
+  tag: ""               # set by Flux image automation
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+# The container listens on this port. The Service uses the same port,
+# so other pods call http://<name>:8080.
+port: 8080
+
+probes:
+  path: /health
+
+# Plain environment variables: NAME: value
+env: {}
+
+# Secrets whose keys become environment variables (made by ExternalSecrets).
+envFromSecrets: []
+
+# OpenTelemetry: the homelab's Grafana Alloy gateway. The app needs the
+# OpenTelemetry .NET SDK with UseOtlpExporter() before anything arrives.
+otel:
+  enabled: true
+  endpoint: http://alloy.monitoring.svc.cluster.local:4317
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 96Mi
+  limits:
+    memory: 256Mi
+
+# 1654 is the "app" user in the Microsoft .NET images.
+# The frontend (nginx-unprivileged) overrides it with 101.
+runAsUser: 1654

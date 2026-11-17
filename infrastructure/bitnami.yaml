@@ -1,0 +1,10 @@
+# The Bitnami charts, the same ones the class uses
+# (helm install ... oci://registry-1.docker.io/bitnamicharts/<chart>).
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: bitnami
+spec:
+  type: oci
+  url: oci://registry-1.docker.io/bitnamicharts
+  interval: 12h

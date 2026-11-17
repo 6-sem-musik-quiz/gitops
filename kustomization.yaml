@@ -1,0 +1,8 @@
+# The entry point. The homelab's Flux Kustomization "quiz" applies this folder
+# into the namespace quiz, as the service account quiz-flux.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: quiz
+resources:
+  - infrastructure
+  - apps

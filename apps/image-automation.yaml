@@ -1,0 +1,147 @@
+# Flux image automation: Flux watches GHCR, and when CI pushes a new image it
+# writes the new tag into apps/*.yaml (at the {"$imagepolicy": ...} markers)
+# and pushes the commit to main. Nobody edits an image tag by hand.
+#
+# Tag format from CI: <run number>-<8 char sha>-<unix time>, e.g. 12-a1b2c3d4-1791234567.
+# The newest unix time wins (the run number restarts if the workflow file is renamed).
+#
+# edgeservice and frontend are left out until their repos have images.
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: userservice
+spec:
+  image: ghcr.io/6-sem-musik-quiz/userservice
+  interval: 5m
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: userservice
+spec:
+  imageRepositoryRef:
+    name: userservice
+  filterTags:
+    pattern: '^\d+-[a-f0-9]{8}-(?P<ts>\d+)$'
+    extract: '$ts'
+  policy:
+    numerical:
+      order: asc
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: lobbyservice
+spec:
+  image: ghcr.io/6-sem-musik-quiz/lobbyservice
+  interval: 5m
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: lobbyservice
+spec:
+  imageRepositoryRef:
+    name: lobbyservice
+  filterTags:
+    pattern: '^\d+-[a-f0-9]{8}-(?P<ts>\d+)$'
+    extract: '$ts'
+  policy:
+    numerical:
+      order: asc
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: gameservice
+spec:
+  image: ghcr.io/6-sem-musik-quiz/gameservice
+  interval: 5m
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: gameservice
+spec:
+  imageRepositoryRef:
+    name: gameservice
+  filterTags:
+    pattern: '^\d+-[a-f0-9]{8}-(?P<ts>\d+)$'
+    extract: '$ts'
+  policy:
+    numerical:
+      order: asc
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: musicservice
+spec:
+  image: ghcr.io/6-sem-musik-quiz/musicservice
+  interval: 5m
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: musicservice
+spec:
+  imageRepositoryRef:
+    name: musicservice
+  filterTags:
+    pattern: '^\d+-[a-f0-9]{8}-(?P<ts>\d+)$'
+    extract: '$ts'
+  policy:
+    numerical:
+      order: asc
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: statisticservice
+spec:
+  image: ghcr.io/6-sem-musik-quiz/statisticservice
+  interval: 5m
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: statisticservice
+spec:
+  imageRepositoryRef:
+    name: statisticservice
+  filterTags:
+    pattern: '^\d+-[a-f0-9]{8}-(?P<ts>\d+)$'
+    extract: '$ts'
+  policy:
+    numerical:
+      order: asc
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageUpdateAutomation
+metadata:
+  name: quiz
+spec:
+  interval: 5m
+  sourceRef:
+    kind: GitRepository
+    name: quiz
+  git:
+    checkout:
+      ref:
+        branch: main
+    commit:
+      author:
+        name: fluxcdbot
+        email: fluxcdbot@users.noreply.github.com
+      messageTemplate: |
+        Update images
+
+        {{ range .Changed.Changes -}}
+        - {{ .OldValue }} -> {{ .NewValue }}
+        {{ end -}}
+    push:
+      branch: main
+  update:
+    path: ./apps
+    strategy: Setters

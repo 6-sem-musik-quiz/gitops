@@ -1,0 +1,56 @@
+# GameService: runs the games, publishes results to RabbitMQ. Database: gameservice.
+#
+# Secret: the connection strings, built from the passwords in OpenBao.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: gameservice-secrets
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: SecretStore
+    name: openbao
+  target:
+    name: gameservice-secrets
+    template:
+      engineVersion: v2
+      data:
+        ConnectionStrings__Default: "Host=postgresql.quiz.svc.cluster.local;Port=5432;Database=gameservice;Username=gameservice;Password={{ .dbPassword }}"
+        RabbitMQ__Host: "rabbitmq.quiz.svc.cluster.local"
+        RabbitMQ__Username: "{{ .rabbitUser }}"
+        RabbitMQ__Password: "{{ .rabbitPassword }}"
+  data:
+    - secretKey: dbPassword
+      remoteRef:
+        key: quiz/postgres
+        property: gameservice
+    - secretKey: rabbitUser
+      remoteRef:
+        key: quiz/rabbitmq
+        property: username
+    - secretKey: rabbitPassword
+      remoteRef:
+        key: quiz/rabbitmq
+        property: password
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: gameservice
+spec:
+  interval: 10m
+  dependsOn:
+    - name: postgresql
+  chart:
+    spec:
+      chart: ./charts/quiz-service
+      reconcileStrategy: Revision   # a chart change in Git is picked up without a version bump
+      sourceRef:
+        kind: GitRepository
+        name: quiz
+  values:
+    image:
+      repository: ghcr.io/6-sem-musik-quiz/gameservice
+      tag: 0-00000000-0 # {"$imagepolicy": "quiz:gameservice:tag"}
+    envFromSecrets:
+      - gameservice-secrets

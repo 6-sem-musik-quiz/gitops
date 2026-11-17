@@ -1,0 +1,84 @@
+# One PostgreSQL server with one database and one user per service.
+# Every password lives in OpenBao at kv/quiz/postgres:
+#   postgres-password, userservice, lobbyservice, gameservice, musicservice, statisticservice
+# Services reach it at postgresql.quiz.svc.cluster.local:5432.
+
+# The admin password for the chart.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: postgresql-auth
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: SecretStore
+    name: openbao
+  target:
+    name: postgresql-auth
+  data:
+    - secretKey: postgres-password
+      remoteRef:
+        key: quiz/postgres
+        property: postgres-password
+---
+# The first-boot script: one user and one database per service.
+# It only runs when the volume is empty. To change it later, use psql.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: postgresql-initdb
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: SecretStore
+    name: openbao
+  target:
+    name: postgresql-initdb
+    template:
+      engineVersion: v2
+      data:
+        01-services.sql: |
+          CREATE USER userservice WITH PASSWORD '{{ .userservice }}';
+          CREATE DATABASE userservice OWNER userservice;
+          CREATE USER lobbyservice WITH PASSWORD '{{ .lobbyservice }}';
+          CREATE DATABASE lobbyservice OWNER lobbyservice;
+          CREATE USER gameservice WITH PASSWORD '{{ .gameservice }}';
+          CREATE DATABASE gameservice OWNER gameservice;
+          CREATE USER musicservice WITH PASSWORD '{{ .musicservice }}';
+          CREATE DATABASE musicservice OWNER musicservice;
+          CREATE USER statisticservice WITH PASSWORD '{{ .statisticservice }}';
+          CREATE DATABASE statisticservice OWNER statisticservice;
+  dataFrom:
+    - extract:
+        key: quiz/postgres
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: postgresql
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: postgresql
+      version: "18.12.20"
+      sourceRef:
+        kind: HelmRepository
+        name: bitnami
+  values:
+    auth:
+      existingSecret: postgresql-auth
+      secretKeys:
+        adminPasswordKey: postgres-password
+    primary:
+      initdb:
+        scriptsSecret: postgresql-initdb
+      persistence:
+        size: 5Gi
+      resourcesPreset: none
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          memory: 512Mi

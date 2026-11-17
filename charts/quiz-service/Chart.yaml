@@ -1,0 +1,5 @@
+apiVersion: v2
+name: quiz-service
+description: One chart for every service of the music quiz (the 5 APIs, the edge service and the frontend)
+type: application
+version: 0.1.0

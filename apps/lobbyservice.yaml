@@ -1,0 +1,51 @@
+# LobbyService: lobbies. Database: lobbyservice, cache: Redis.
+#
+# Secret: the connection strings, built from the passwords in OpenBao.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: lobbyservice-secrets
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: SecretStore
+    name: openbao
+  target:
+    name: lobbyservice-secrets
+    template:
+      engineVersion: v2
+      data:
+        ConnectionStrings__Default: "Host=postgresql.quiz.svc.cluster.local;Port=5432;Database=lobbyservice;Username=lobbyservice;Password={{ .dbPassword }}"
+        ConnectionStrings__Redis: "redis-master.quiz.svc.cluster.local:6379,password={{ .redisPassword }}"
+  data:
+    - secretKey: dbPassword
+      remoteRef:
+        key: quiz/postgres
+        property: lobbyservice
+    - secretKey: redisPassword
+      remoteRef:
+        key: quiz/redis
+        property: password
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: lobbyservice
+spec:
+  interval: 10m
+  dependsOn:
+    - name: postgresql
+    - name: redis
+  chart:
+    spec:
+      chart: ./charts/quiz-service
+      reconcileStrategy: Revision   # a chart change in Git is picked up without a version bump
+      sourceRef:
+        kind: GitRepository
+        name: quiz
+  values:
+    image:
+      repository: ghcr.io/6-sem-musik-quiz/lobbyservice
+      tag: 0-00000000-0 # {"$imagepolicy": "quiz:lobbyservice:tag"}
+    envFromSecrets:
+      - lobbyservice-secrets

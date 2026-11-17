@@ -1,0 +1,26 @@
+# EdgeService: the API gateway (YARP). The only backend that the internet reaches.
+# Cloudflare Tunnel sends https://quiz.munkcloud.dk/api/* (and /hubs/* for SignalR)
+# to http://edgeservice.quiz.svc.cluster.local:8080. YARP routes each path to
+# a private service, e.g. /api/users/* -> http://userservice:8080.
+# The routes live in the EdgeService repo (appsettings.json), not here.
+#
+# Not in apps/kustomization.yaml yet: the repo 6-sem-musik-quiz/EdgeService
+# and its first image must exist first.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: edgeservice
+spec:
+  interval: 10m
+  chart:
+    spec:
+      chart: ./charts/quiz-service
+      reconcileStrategy: Revision
+      sourceRef:
+        kind: GitRepository
+        name: quiz
+  values:
+    image:
+      repository: ghcr.io/6-sem-musik-quiz/edgeservice
+      tag: 0-00000000-0 # {"$imagepolicy": "quiz:edgeservice:tag"}
+    replicaCount: 2   # the single entry point: keep one pod up during a rollout
