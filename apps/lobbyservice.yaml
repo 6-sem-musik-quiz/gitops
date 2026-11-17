@@ -39,13 +39,13 @@ spec:
   chart:
     spec:
       chart: ./charts/quiz-service
-      reconcileStrategy: Revision   # a chart change in Git is picked up without a version bump
+      reconcileStrategy: Revision # a chart change in Git is picked up without a version bump
       sourceRef:
         kind: GitRepository
         name: quiz
   values:
     image:
       repository: ghcr.io/6-sem-musik-quiz/lobbyservice
-      tag: 0-00000000-0 # {"$imagepolicy": "quiz:lobbyservice:tag"}
+      tag: 5-36e38e3d-1794917309 # {"$imagepolicy": "quiz:lobbyservice:tag"}
     envFromSecrets:
       - lobbyservice-secrets
