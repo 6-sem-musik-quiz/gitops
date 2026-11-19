@@ -32,7 +32,7 @@ Never edit an image tag by hand; Flux owns the lines with `{"$imagepolicy": ...}
 | Name | Reached from | Address |
 |---|---|---|
 | frontend | the internet | `https://quiz.munkcloud.dk` (Cloudflare Tunnel) |
-| edgeservice (YARP) | the internet | `https://quiz.munkcloud.dk/api/*`, `/hubs/*` |
+| edgeservice (YARP) | the internet | `https://quiz.munkcloud.dk/api/<service>/*`, own endpoints at `/api/edge` |
 | userservice, lobbyservice, gameservice, musicservice, statisticservice | inside the cluster only | `http://<name>:8080` |
 | postgresql | inside the cluster only | `postgresql:5432` |
 | redis | inside the cluster only | `redis-master:6379` |

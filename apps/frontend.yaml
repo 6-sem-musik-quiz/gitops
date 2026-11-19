@@ -1,7 +1,7 @@
 # Frontend: Blazor WebAssembly, published as static files and served by
 # nginx-unprivileged (listens on 8080, runs as user 101).
-# Cloudflare Tunnel sends https://quiz.munkcloud.dk/* (everything except /api
-# and /hubs) here. The browser calls /api on the same hostname, so no CORS.
+# Cloudflare Tunnel sends https://quiz.munkcloud.dk/* (everything except /api)
+# here. The browser calls /api on the same hostname, so no CORS.
 #
 # The Frontend repo needs a Dockerfile like:
 #   FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build

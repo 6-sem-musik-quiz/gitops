@@ -1,7 +1,8 @@
 # EdgeService: the API gateway (YARP). The only backend that the internet reaches.
-# Cloudflare Tunnel sends https://quiz.munkcloud.dk/api/* (and /hubs/* for SignalR)
-# to http://edgeservice.quiz.svc.cluster.local:8080. YARP routes each path to
-# a private service, e.g. /api/users/* -> http://userservice:8080.
+# Cloudflare Tunnel sends https://quiz.munkcloud.dk/api/* to
+# http://edgeservice.quiz.svc.cluster.local:8080. YARP routes /api/<service>/<rest>
+# to http://<service>:8080/api/<rest>, e.g. /api/userservice/users/1 -> userservice
+# /api/users/1. The edge's own endpoints are under /api/edge.
 # The routes live in the EdgeService repo (appsettings.json), not here.
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
