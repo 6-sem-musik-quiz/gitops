@@ -51,6 +51,6 @@ spec:
   values:
     image:
       repository: ghcr.io/6-sem-musik-quiz/statisticservice
-      tag: 5-b6b1246a-1794917240 # {"$imagepolicy": "quiz:statisticservice:tag"}
+      tag: 7-80029079-1795086139 # {"$imagepolicy": "quiz:statisticservice:tag"}
     envFromSecrets:
       - statisticservice-secrets
