@@ -47,5 +47,7 @@ spec:
     image:
       repository: ghcr.io/6-sem-musik-quiz/lobbyservice
       tag: 5-36e38e3d-1794917309 # {"$imagepolicy": "quiz:lobbyservice:tag"}
+    probes:
+      readinessPath: /health/ready # ready only when Postgres answers
     envFromSecrets:
       - lobbyservice-secrets

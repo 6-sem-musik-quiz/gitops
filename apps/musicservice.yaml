@@ -41,5 +41,7 @@ spec:
     image:
       repository: ghcr.io/6-sem-musik-quiz/musicservice
       tag: 5-5af2df79-1794917255 # {"$imagepolicy": "quiz:musicservice:tag"}
+    probes:
+      readinessPath: /health/ready # ready only when Postgres answers
     envFromSecrets:
       - musicservice-secrets
