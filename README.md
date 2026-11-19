@@ -91,14 +91,13 @@ kubectl get helmreleases                             # did Flux install everythi
 
 ## Postgres in pgAdmin
 
-Postgres is not exposed outside the cluster, so open a tunnel first (Tailscale
-on, your quiz kubeconfig active). Keep the terminal open while you use pgAdmin.
+Postgres is on the tailnet as `quiz-postgres.tail5a1bc5.ts.net:5432` (the
+Service `postgresql-tailnet`). With Tailscale on, connect straight to it; no
+port-forward is needed. Your Tailscale ACL must allow that host.
 
-```bash
-kubectl -n quiz port-forward svc/postgresql 15432:5432
-```
+Fallback without tailnet access: `kubectl -n quiz port-forward svc/postgresql 15432:5432`
+and use host `localhost`, port `15432` (not 5432, which a local Postgres may already use).
 
-The local port is 15432 so it does not clash with a local docker-compose Postgres on 5432.
 Get the admin password:
 
 ```bash
@@ -108,6 +107,6 @@ kubectl -n quiz get secret postgresql-auth -o jsonpath="{.data.postgres-password
 (On PowerShell without `base64`, use
 `[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((kubectl -n quiz get secret postgresql-auth -o jsonpath="{.data.postgres-password}")))`.)
 
-In pgAdmin choose Register > Server and fill in: host `localhost`, port `15432`, maintenance DB `postgres`,
+In pgAdmin choose Register > Server and fill in: host `quiz-postgres.tail5a1bc5.ts.net`, port `5432`, maintenance DB `postgres`,
 username `postgres`, and the password from above. Each service has its own database
 (`userservice`, `lobbyservice`, `gameservice`, `musicservice`, `statisticservice`).
