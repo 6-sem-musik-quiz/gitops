@@ -82,3 +82,25 @@ spec:
           memory: 256Mi
         limits:
           memory: 512Mi
+---
+# Postgres on the tailnet, so pgAdmin/psql work without kubectl port-forward:
+#   quiz-postgres.tail5a1bc5.ts.net:5432
+# Only reachable over Tailscale. The homelab only allows class tailscale here.
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-tailnet
+  annotations:
+    tailscale.com/hostname: quiz-postgres
+spec:
+  type: LoadBalancer
+  loadBalancerClass: tailscale
+  allocateLoadBalancerNodePorts: false # node ports are not allowed in quiz
+  selector:
+    app.kubernetes.io/component: primary
+    app.kubernetes.io/instance: postgresql
+    app.kubernetes.io/name: postgresql
+  ports:
+    - name: tcp-postgresql
+      port: 5432
+      targetPort: tcp-postgresql
