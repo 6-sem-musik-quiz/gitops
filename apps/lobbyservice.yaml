@@ -1,6 +1,6 @@
-# LobbyService: lobbies. Database: lobbyservice, cache: Redis.
+# LobbyService: lobbies. No SQL database in the C4 design; active lobbies live in Redis.
 #
-# Secret: the connection strings, built from the passwords in OpenBao.
+# Secret: the Redis connection string, built from the password in OpenBao.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -15,13 +15,8 @@ spec:
     template:
       engineVersion: v2
       data:
-        ConnectionStrings__Default: "Host=postgresql.quiz.svc.cluster.local;Port=5432;Database=lobbyservice;Username=lobbyservice;Password={{ .dbPassword }}"
         ConnectionStrings__Redis: "redis-master.quiz.svc.cluster.local:6379,password={{ .redisPassword }}"
   data:
-    - secretKey: dbPassword
-      remoteRef:
-        key: quiz/postgres
-        property: lobbyservice
     - secretKey: redisPassword
       remoteRef:
         key: quiz/redis
@@ -34,7 +29,6 @@ metadata:
 spec:
   interval: 10m
   dependsOn:
-    - name: postgresql
     - name: redis
   chart:
     spec:

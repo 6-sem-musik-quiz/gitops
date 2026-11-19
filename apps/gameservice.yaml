@@ -1,6 +1,6 @@
-# GameService: runs the games, publishes results to RabbitMQ. Database: gameservice.
+# GameService: runs the games, publishes results to RabbitMQ. No SQL database in the C4 design.
 #
-# Secret: the connection strings, built from the passwords in OpenBao.
+# Secret: the RabbitMQ settings, built from the passwords in OpenBao.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -15,15 +15,10 @@ spec:
     template:
       engineVersion: v2
       data:
-        ConnectionStrings__Default: "Host=postgresql.quiz.svc.cluster.local;Port=5432;Database=gameservice;Username=gameservice;Password={{ .dbPassword }}"
         RabbitMQ__Host: "rabbitmq.quiz.svc.cluster.local"
         RabbitMQ__Username: "{{ .rabbitUser }}"
         RabbitMQ__Password: "{{ .rabbitPassword }}"
   data:
-    - secretKey: dbPassword
-      remoteRef:
-        key: quiz/postgres
-        property: gameservice
     - secretKey: rabbitUser
       remoteRef:
         key: quiz/rabbitmq
@@ -39,8 +34,6 @@ metadata:
   name: gameservice
 spec:
   interval: 10m
-  dependsOn:
-    - name: postgresql
   chart:
     spec:
       chart: ./charts/quiz-service
