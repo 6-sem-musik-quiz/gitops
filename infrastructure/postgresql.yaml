@@ -86,12 +86,16 @@ spec:
 # Postgres on the tailnet, so pgAdmin/psql work without kubectl port-forward:
 #   quiz-postgres.tail5a1bc5.ts.net:5432
 # Only reachable over Tailscale. The homelab only allows class tailscale here.
+# Tailscale ACL: group:quiz -> tag:quiz-postgres tcp:5432 (set in the admin console).
 apiVersion: v1
 kind: Service
 metadata:
   name: postgresql-tailnet
   annotations:
     tailscale.com/hostname: quiz-postgres
+    # Own tag, so the Tailscale ACL can give group:quiz tcp:5432 here and
+    # nothing else (tag:k8s is shared with Traefik and hello-api).
+    tailscale.com/tags: tag:quiz-postgres
 spec:
   type: LoadBalancer
   loadBalancerClass: tailscale
