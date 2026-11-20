@@ -13,7 +13,7 @@ infrastructure/
   postgresql.yaml           1 Postgres, 1 database + 1 user per service
   redis.yaml                cache for LobbyService
   rabbitmq.yaml             queue GameService -> StatisticService (plain YAML)
-  garage.yaml               BlobStorage for the song files, behind Cloudflare CDN (plain YAML)
+  garage.yaml               BlobStorage for the song files, behind Cloudflare CDN (Garage's chart from git)
 apps/
   <service>.yaml            ExternalSecret (connection strings) + HelmRelease
   image-automation.yaml     Flux finds new images and commits their tags
@@ -79,7 +79,8 @@ password in `kv/quiz/postgres` also needs an `ALTER USER` in psql.
 ## BlobStorage (Garage)
 
 The song files live in [Garage](https://garagehq.deuxfleurs.fr), an open-source
-S3-compatible object store ([`infrastructure/garage.yaml`](infrastructure/garage.yaml)).
+S3-compatible object store, installed with its official Helm chart
+([`infrastructure/garage.yaml`](infrastructure/garage.yaml)).
 MusicService uploads with an S3 client; players download through Cloudflare CDN:
 
 ```
@@ -94,16 +95,14 @@ player --GET--> media.munkcloud.dk (Cloudflare CDN) --cache miss--> Tunnel --> g
 - **Cache:** Cloudflare caches `media.munkcloud.dk` for a long time. Upload a changed
   file under a new key (e.g. `songs/<id>-<hash>.mp3`) instead of overwriting one.
 
-### One-time setup (already done; only again on a fresh volume)
+### One-time setup (after the first deploy, and again only on a fresh volume)
 
-Garage needs a cluster layout, a bucket and a key before it serves anything.
-In PowerShell:
+`--single-node` makes the cluster layout by itself. The bucket and MusicService's
+key are made once by hand. In PowerShell:
 
 ```powershell
-function garage { kubectl -n quiz exec garage-0 -- /garage @args }
-garage status                                   # copy the node ID
-garage layout assign -z homelab -c 10G <node-id>
-garage layout apply --version 1
+function garage { kubectl -n quiz exec garage-0 -c garage -- /garage @args }
+garage status                                   # one node, with a role in the layout
 garage bucket create media
 garage bucket alias media media.munkcloud.dk    # the web endpoint matches the Host header
 garage bucket website --allow media
@@ -116,9 +115,10 @@ garage bucket allow --read --write --owner media --key musicservice
 ### Scaling
 
 One node with `replication_factor = 1` now, because the cluster has one node.
-More nodes: raise `replicas`, set `replication_factor = 3` and assign the new nodes in
-the layout. Garage then spreads the 256 partitions over the nodes (Z-axis) and keeps 3
-copies of each (X-axis). Reads mostly never reach Garage: the CDN serves them.
+More nodes: turn off `singleNode`, set `deployment.replicaCount` and
+`replication_factor = 3`, and assign the new nodes in the layout (`garage layout assign`).
+Garage then spreads the 256 partitions over the nodes (Z-axis) and keeps 3 copies of
+each (X-axis). Reads mostly never reach Garage: the CDN serves them.
 
 ## What the services must do
 

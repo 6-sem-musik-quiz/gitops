@@ -2,18 +2,31 @@
 # MusicService owns it (C4: BlobStorageClient -> BlobStorage). Cloudflare CDN
 # sits in front and fetches from Garage's web endpoint on a cache miss.
 #
-# Plain YAML, not Garage's Helm chart: that chart is only published in
-# Garage's own git repo, and this repo may not create GitRepositories.
+# Garage's official Helm chart. It is only published inside Garage's own git
+# repo, so Flux pulls it with a GitRepository pinned to a release tag.
 #
-# One node, replication_factor = 1: the homelab cluster has a single node.
-# More nodes = raise replicas + replication_factor (see README, "BlobStorage").
+# One node (singleNode: --single-node, replication_factor = 1): the homelab
+# cluster has a single node. Scaling: see README, "BlobStorage".
 #
 # Secrets in OpenBao at kv/quiz/garage (properties: rpc-secret, admin-token).
 #
 # Ports (all inside the cluster, except 3902 through the Cloudflare Tunnel):
-#   garage:3900  S3 API     MusicService uploads here (path-style, region "garage")
-#   garage:3902  web        public read of buckets with website access -> media.munkcloud.dk
-#   garage:3903  admin API  /health, /metrics
+#   garage:3900        S3 API     MusicService uploads here (path-style, region "garage")
+#   garage:3902        web        public read of buckets with website access -> media.munkcloud.dk
+#   garage-admin:3903  admin API  /health, /metrics
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: garage
+spec:
+  interval: 12h
+  url: https://git.deuxfleurs.fr/Deuxfleurs/garage.git
+  ref:
+    tag: v2.5.0        # chart 0.10.4, Garage v2.5.0
+  ignore: |
+    /*
+    !/script/helm/garage/
+---
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -26,7 +39,7 @@ spec:
   target:
     name: garage-auth
   data:
-    - secretKey: rpc-secret
+    - secretKey: rpcSecret          # the key name the chart expects
       remoteRef:
         key: quiz/garage
         property: rpc-secret
@@ -58,157 +71,111 @@ spec:
         key: quiz/blobstorage
         property: secret-access-key
 ---
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: garage-config
-data:
-  garage.toml: |
-    metadata_dir = "/var/lib/garage/meta"
-    data_dir = "/var/lib/garage/data"
-    db_engine = "lmdb"
-    replication_factor = 1
-
-    rpc_bind_addr = "0.0.0.0:3901"
-    rpc_public_addr = "127.0.0.1:3901"
-    # rpc_secret comes from GARAGE_RPC_SECRET
-
-    [s3_api]
-    s3_region = "garage"
-    api_bind_addr = "0.0.0.0:3900"
-    root_domain = ".s3.garage.internal"
-
-    [s3_web]
-    # A request is served from the bucket whose name or alias equals the
-    # Host header, so the bucket alias "media.munkcloud.dk" answers for the CDN.
-    bind_addr = "0.0.0.0:3902"
-    root_domain = ".web.garage.internal"
-    index = "index.html"
-
-    [admin]
-    api_bind_addr = "0.0.0.0:3903"
-    # admin_token comes from GARAGE_ADMIN_TOKEN
----
-apiVersion: v1
-kind: Service
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
 metadata:
   name: garage
-  labels:
-    app.kubernetes.io/name: garage
 spec:
-  selector:
-    app.kubernetes.io/name: garage
-  ports:
-    - name: s3
-      port: 3900
-      targetPort: s3
-    - name: web
-      port: 3902
-      targetPort: web
-    - name: admin
-      port: 3903
-      targetPort: admin
----
-# Headless Service: gives the StatefulSet pod a stable DNS name.
-apiVersion: v1
-kind: Service
-metadata:
-  name: garage-headless
-  labels:
-    app.kubernetes.io/name: garage
-spec:
-  clusterIP: None
-  selector:
-    app.kubernetes.io/name: garage
-  ports:
-    - name: rpc
-      port: 3901
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: garage
-  labels:
-    app.kubernetes.io/name: garage
-spec:
-  serviceName: garage-headless
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: garage
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: garage
+  interval: 30m
+  chart:
     spec:
-      automountServiceAccountToken: false
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
-        runAsGroup: 1000
-        fsGroup: 1000
-        seccompProfile:
-          type: RuntimeDefault
-      containers:
-        - name: garage
-          image: dxflrs/garage:v2.5.0
-          ports:
-            - name: s3
-              containerPort: 3900
-            - name: rpc
-              containerPort: 3901
-            - name: web
-              containerPort: 3902
-            - name: admin
-              containerPort: 3903
-          env:
-            - name: GARAGE_RPC_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: garage-auth
-                  key: rpc-secret
-            - name: GARAGE_ADMIN_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: garage-auth
-                  key: admin-token
-          # TCP, not /health: /health is 503 until the one-time layout is applied.
-          readinessProbe:
-            tcpSocket:
-              port: s3
-            periodSeconds: 10
-          livenessProbe:
-            tcpSocket:
-              port: s3
-            initialDelaySeconds: 30
-            periodSeconds: 30
-          resources:
-            requests:
-              cpu: 50m
-              memory: 128Mi
-            limits:
-              memory: 512Mi
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop: ["ALL"]
-          volumeMounts:
-            - name: config
-              mountPath: /etc/garage.toml
-              subPath: garage.toml
-              readOnly: true
-            - name: data
-              mountPath: /var/lib/garage
-      volumes:
-        - name: config
-          configMap:
-            name: garage-config
-  volumeClaimTemplates:
-    - metadata:
-        name: data
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: 10Gi
+      chart: ./script/helm/garage
+      sourceRef:
+        kind: GitRepository
+        name: garage
+  values:
+    image:
+      repository: dxflrs/garage   # the tag comes from the chart's appVersion
+    garage:
+      singleNode: true
+      existingRpcSecret: garage-auth
+      noClusterRole: true         # a Role instead of a ClusterRole (removed below)
+      # Our own garage.toml: the chart's default adds Kubernetes peer discovery,
+      # which needs a cluster-wide CRD and is pointless on one node.
+      # The chart's init container fills in __RPC_SECRET_REPLACE__.
+      garageTomlString: |
+        metadata_dir = "/mnt/meta"
+        data_dir = "/mnt/data"
+        db_engine = "lmdb"
+        replication_factor = 1
+        rpc_bind_addr = "0.0.0.0:3901"
+        rpc_public_addr = "127.0.0.1:3901"
+        rpc_secret = "__RPC_SECRET_REPLACE__"
+
+        [s3_api]
+        s3_region = "garage"
+        api_bind_addr = "0.0.0.0:3900"
+        root_domain = ".s3.garage.internal"
+
+        [s3_web]
+        # A request is served from the bucket whose name or alias equals the
+        # Host header, so the bucket alias "media.munkcloud.dk" answers for the CDN.
+        bind_addr = "0.0.0.0:3902"
+        root_domain = ".web.garage.internal"
+        index = "index.html"
+
+        [admin]
+        api_bind_addr = "0.0.0.0:3903"
+        # admin_token comes from GARAGE_ADMIN_TOKEN
+    environment:
+      - name: GARAGE_ADMIN_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: garage-auth
+            key: admin-token
+    serviceAccount:
+      create: false               # no Kubernetes API access needed
+    service:
+      admin:
+        enabled: true
+    persistence:
+      meta:
+        size: 1Gi
+      data:
+        size: 10Gi
+    podSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+      fsGroupChangePolicy: OnRootMismatch
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop: ["ALL"]
+    # TCP, not /health: /health only says OK once the node is in a layout.
+    readinessProbe:
+      tcpSocket:
+        port: 3900
+      periodSeconds: 10
+    livenessProbe:
+      tcpSocket:
+        port: 3900
+      initialDelaySeconds: 30
+      periodSeconds: 30
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 512Mi
+  # The chart always renders a Role + RoleBinding for Kubernetes discovery.
+  # quiz-helm may not create RBAC objects, and we don't use discovery: drop them.
+  postRenderers:
+    - kustomize:
+        patches:
+          - patch: |
+              $patch: delete
+              apiVersion: rbac.authorization.k8s.io/v1
+              kind: Role
+              metadata:
+                name: manage-crds-quiz-garage
+          - patch: |
+              $patch: delete
+              apiVersion: rbac.authorization.k8s.io/v1
+              kind: RoleBinding
+              metadata:
+                name: allow-crds-for-quiz-garage
