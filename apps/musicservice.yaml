@@ -1,4 +1,4 @@
-# MusicService: songs and playlists. Database: musicservice. (Blob storage for the song files: not decided yet.)
+# MusicService: songs and playlists. Database: musicservice. Song files: Garage (infrastructure/garage.yaml, README "BlobStorage").
 #
 # Secret: the connection strings, built from the passwords in OpenBao.
 apiVersion: external-secrets.io/v1

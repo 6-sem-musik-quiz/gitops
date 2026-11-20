@@ -13,6 +13,7 @@ infrastructure/
   postgresql.yaml           1 Postgres, 1 database + 1 user per service
   redis.yaml                cache for LobbyService
   rabbitmq.yaml             queue GameService -> StatisticService (plain YAML)
+  garage.yaml               BlobStorage for the song files, behind Cloudflare CDN (plain YAML)
 apps/
   <service>.yaml            ExternalSecret (connection strings) + HelmRelease
   image-automation.yaml     Flux finds new images and commits their tags
@@ -37,6 +38,8 @@ Never edit an image tag by hand; Flux owns the lines with `{"$imagepolicy": ...}
 | postgresql | inside the cluster only | `postgresql:5432` |
 | redis | inside the cluster only | `redis-master:6379` |
 | rabbitmq | inside the cluster only | `rabbitmq:5672`, UI on 15672 |
+| garage (S3 API) | inside the cluster only | `http://garage:3900`, region `garage`, path-style |
+| garage (public files) | the internet, through Cloudflare CDN | `https://media.munkcloud.dk/<key>` (bucket `media`) |
 
 ## Secrets
 
@@ -72,6 +75,50 @@ and drops the other keys. A changed secret reaches the cluster within an hour
 `kubectl delete pod -l app.kubernetes.io/name=<service>`.
 Note that Postgres only reads its passwords on its very first start, so a new
 password in `kv/quiz/postgres` also needs an `ALTER USER` in psql.
+
+## BlobStorage (Garage)
+
+The song files live in [Garage](https://garagehq.deuxfleurs.fr), an open-source
+S3-compatible object store ([`infrastructure/garage.yaml`](infrastructure/garage.yaml)).
+MusicService uploads with an S3 client; players download through Cloudflare CDN:
+
+```
+MusicService --S3 PUT--> garage:3900          (bucket "media")
+player --GET--> media.munkcloud.dk (Cloudflare CDN) --cache miss--> Tunnel --> garage:3902
+```
+
+- **S3 client settings:** `ServiceURL = http://garage.quiz.svc.cluster.local:3900`,
+  `ForcePathStyle = true`, region `garage`, bucket `media`. The key is the Secret
+  `blobstorage-key` (`access-key-id`, `secret-access-key`), from OpenBao `kv/quiz/blobstorage`.
+- **Everything in `media` is public** through the CDN. Never put private files there.
+- **Cache:** Cloudflare caches `media.munkcloud.dk` for a long time. Upload a changed
+  file under a new key (e.g. `songs/<id>-<hash>.mp3`) instead of overwriting one.
+
+### One-time setup (already done; only again on a fresh volume)
+
+Garage needs a cluster layout, a bucket and a key before it serves anything.
+In PowerShell:
+
+```powershell
+function garage { kubectl -n quiz exec garage-0 -- /garage @args }
+garage status                                   # copy the node ID
+garage layout assign -z homelab -c 10G <node-id>
+garage layout apply --version 1
+garage bucket create media
+garage bucket alias media media.munkcloud.dk    # the web endpoint matches the Host header
+garage bucket website --allow media
+$id  = kubectl -n quiz get secret blobstorage-key -o go-template='{{index .data "access-key-id" | base64decode}}'
+$sec = kubectl -n quiz get secret blobstorage-key -o go-template='{{index .data "secret-access-key" | base64decode}}'
+garage key import --yes -n musicservice $id $sec
+garage bucket allow --read --write --owner media --key musicservice
+```
+
+### Scaling
+
+One node with `replication_factor = 1` now, because the cluster has one node.
+More nodes: raise `replicas`, set `replication_factor = 3` and assign the new nodes in
+the layout. Garage then spreads the 256 partitions over the nodes (Z-axis) and keeps 3
+copies of each (X-axis). Reads mostly never reach Garage: the CDN serves them.
 
 ## What the services must do
 
