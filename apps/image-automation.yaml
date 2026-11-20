@@ -4,8 +4,6 @@
 #
 # Tag format from CI: <run number>-<8 char sha>-<unix time>, e.g. 12-a1b2c3d4-1791234567.
 # The newest unix time wins (the run number restarts if the workflow file is renamed).
-#
-# frontend is left out until its repo has images.
 ---
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
@@ -132,6 +130,28 @@ metadata:
 spec:
   imageRepositoryRef:
     name: statisticservice
+  filterTags:
+    pattern: '^\d+-[a-f0-9]{8}-(?P<ts>\d+)$'
+    extract: '$ts'
+  policy:
+    numerical:
+      order: asc
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: frontend
+spec:
+  image: ghcr.io/6-sem-musik-quiz/frontend
+  interval: 5m
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: frontend
+spec:
+  imageRepositoryRef:
+    name: frontend
   filterTags:
     pattern: '^\d+-[a-f0-9]{8}-(?P<ts>\d+)$'
     extract: '$ts'
