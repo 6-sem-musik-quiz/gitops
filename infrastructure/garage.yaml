@@ -13,7 +13,7 @@
 # Ports (all inside the cluster, except 3902 through the Cloudflare Tunnel):
 #   garage:3900        S3 API     MusicService uploads here (path-style, region "garage")
 #   garage:3902        web        public read of buckets with website access -> media.munkcloud.dk
-#   garage-admin:3903  admin API  /health, /metrics
+#   garage-admin:3903  admin API  /health, /metrics (also garage-metrics, scraped by Prometheus)
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: GitRepository
 metadata:
@@ -162,6 +162,15 @@ spec:
         memory: 128Mi
       limits:
         memory: 512Mi
+    # /metrics on the admin port (3903), scraped by the homelab Prometheus.
+    # Shows in Grafana (Quiz org): S3 and web (= CDN cache miss) requests,
+    # latency, errors, disk. SCRUM-124.
+    monitoring:
+      metrics:
+        enabled: true
+        serviceMonitor:
+          enabled: true
+          interval: 30s
   # The chart always renders a Role + RoleBinding for Kubernetes discovery.
   # quiz-helm may not create RBAC objects, and we don't use discovery: drop them.
   postRenderers:
