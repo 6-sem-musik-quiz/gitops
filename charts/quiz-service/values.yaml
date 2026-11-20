@@ -12,7 +12,8 @@ replicaCount: 1
 port: 8080
 
 probes:
-  path: /health
+  path: /health        # liveness
+  readinessPath: ""  # empty = same as path; backends use /health/ready (checks Postgres)
 
 # Plain environment variables: NAME: value
 env: {}
