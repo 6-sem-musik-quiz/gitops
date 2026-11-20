@@ -40,6 +40,6 @@ spec:
   values:
     image:
       repository: ghcr.io/6-sem-musik-quiz/lobbyservice
-      tag: 8-8aec1ed8-1795085988 # {"$imagepolicy": "quiz:lobbyservice:tag"}
+      tag: 12-0ac1e327-1795181007 # {"$imagepolicy": "quiz:lobbyservice:tag"}
     envFromSecrets:
       - lobbyservice-secrets
