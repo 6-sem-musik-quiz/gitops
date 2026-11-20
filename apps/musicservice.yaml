@@ -1,6 +1,6 @@
 # MusicService: songs and playlists. Database: musicservice. Song files: Garage (infrastructure/garage.yaml, README "BlobStorage").
 #
-# Secret: the connection strings, built from the passwords in OpenBao.
+# Secret: the connection strings and the S3 key for Garage, from OpenBao.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -16,11 +16,21 @@ spec:
       engineVersion: v2
       data:
         ConnectionStrings__Default: "Host=postgresql.quiz.svc.cluster.local;Port=5432;Database=musicservice;Username=musicservice;Password={{ .dbPassword }}"
+        BlobStorage__AccessKeyId: "{{ .blobAccessKeyId }}"
+        BlobStorage__SecretAccessKey: "{{ .blobSecretAccessKey }}"
   data:
     - secretKey: dbPassword
       remoteRef:
         key: quiz/postgres
         property: musicservice
+    - secretKey: blobAccessKeyId
+      remoteRef:
+        key: quiz/blobstorage
+        property: access-key-id
+    - secretKey: blobSecretAccessKey
+      remoteRef:
+        key: quiz/blobstorage
+        property: secret-access-key
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
@@ -41,5 +51,8 @@ spec:
     image:
       repository: ghcr.io/6-sem-musik-quiz/musicservice
       tag: 13-0bd5d954-1795193462 # {"$imagepolicy": "quiz:musicservice:tag"}
+    env:
+      BlobStorage__ServiceUrl: http://garage.quiz.svc.cluster.local:3900
+      BlobStorage__Bucket: media
     envFromSecrets:
       - musicservice-secrets
