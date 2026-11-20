@@ -1,0 +1,181 @@
+# Garage: the BlobStorage (S3-compatible object storage) for the song files.
+# MusicService owns it (C4: BlobStorageClient -> BlobStorage). Cloudflare CDN
+# sits in front and fetches from Garage's web endpoint on a cache miss.
+#
+# Garage's official Helm chart. It is only published inside Garage's own git
+# repo, so Flux pulls it with a GitRepository pinned to a release tag.
+#
+# One node (singleNode: --single-node, replication_factor = 1): the homelab
+# cluster has a single node. Scaling: see README, "BlobStorage".
+#
+# Secrets in OpenBao at kv/quiz/garage (properties: rpc-secret, admin-token).
+#
+# Ports (all inside the cluster, except 3902 through the Cloudflare Tunnel):
+#   garage:3900        S3 API     MusicService uploads here (path-style, region "garage")
+#   garage:3902        web        public read of buckets with website access -> media.munkcloud.dk
+#   garage-admin:3903  admin API  /health, /metrics
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: garage
+spec:
+  interval: 12h
+  url: https://git.deuxfleurs.fr/Deuxfleurs/garage.git
+  ref:
+    tag: v2.5.0        # chart 0.10.4, Garage v2.5.0
+  ignore: |
+    /*
+    !/script/helm/garage/
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: garage-auth
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: SecretStore
+    name: openbao
+  target:
+    name: garage-auth
+  data:
+    - secretKey: rpcSecret          # the key name the chart expects
+      remoteRef:
+        key: quiz/garage
+        property: rpc-secret
+    - secretKey: admin-token
+      remoteRef:
+        key: quiz/garage
+        property: admin-token
+---
+# The S3 key MusicService uploads with. Made in OpenBao (kv/quiz/blobstorage)
+# and imported into Garage once with "garage key import" (README, "BlobStorage").
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: blobstorage-key
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: SecretStore
+    name: openbao
+  target:
+    name: blobstorage-key
+  data:
+    - secretKey: access-key-id
+      remoteRef:
+        key: quiz/blobstorage
+        property: access-key-id
+    - secretKey: secret-access-key
+      remoteRef:
+        key: quiz/blobstorage
+        property: secret-access-key
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: garage
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: ./script/helm/garage
+      sourceRef:
+        kind: GitRepository
+        name: garage
+  values:
+    image:
+      repository: dxflrs/garage   # the tag comes from the chart's appVersion
+    garage:
+      singleNode: true
+      existingRpcSecret: garage-auth
+      noClusterRole: true         # a Role instead of a ClusterRole (removed below)
+      # Our own garage.toml: the chart's default adds Kubernetes peer discovery,
+      # which needs a cluster-wide CRD and is pointless on one node.
+      # The chart's init container fills in __RPC_SECRET_REPLACE__.
+      garageTomlString: |
+        metadata_dir = "/mnt/meta"
+        data_dir = "/mnt/data"
+        db_engine = "lmdb"
+        replication_factor = 1
+        rpc_bind_addr = "0.0.0.0:3901"
+        rpc_public_addr = "127.0.0.1:3901"
+        rpc_secret = "__RPC_SECRET_REPLACE__"
+
+        [s3_api]
+        s3_region = "garage"
+        api_bind_addr = "0.0.0.0:3900"
+        root_domain = ".s3.garage.internal"
+
+        [s3_web]
+        # A request is served from the bucket whose name or alias equals the
+        # Host header, so the bucket alias "media.munkcloud.dk" answers for the CDN.
+        bind_addr = "0.0.0.0:3902"
+        root_domain = ".web.garage.internal"
+        index = "index.html"
+
+        [admin]
+        api_bind_addr = "0.0.0.0:3903"
+        # admin_token comes from GARAGE_ADMIN_TOKEN
+    environment:
+      - name: GARAGE_ADMIN_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: garage-auth
+            key: admin-token
+    serviceAccount:
+      create: false               # no Kubernetes API access needed
+    service:
+      admin:
+        enabled: true
+    persistence:
+      meta:
+        size: 1Gi
+      data:
+        size: 10Gi
+    podSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+      fsGroupChangePolicy: OnRootMismatch
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop: ["ALL"]
+    # TCP, not /health: /health only says OK once the node is in a layout.
+    readinessProbe:
+      tcpSocket:
+        port: 3900
+      periodSeconds: 10
+    livenessProbe:
+      tcpSocket:
+        port: 3900
+      initialDelaySeconds: 30
+      periodSeconds: 30
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 512Mi
+  # The chart always renders a Role + RoleBinding for Kubernetes discovery.
+  # quiz-helm may not create RBAC objects, and we don't use discovery: drop them.
+  postRenderers:
+    - kustomize:
+        patches:
+          - patch: |
+              $patch: delete
+              apiVersion: rbac.authorization.k8s.io/v1
+              kind: Role
+              metadata:
+                name: manage-crds-quiz-garage
+          - patch: |
+              $patch: delete
+              apiVersion: rbac.authorization.k8s.io/v1
+              kind: RoleBinding
+              metadata:
+                name: allow-crds-for-quiz-garage
