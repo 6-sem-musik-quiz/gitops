@@ -43,6 +43,8 @@ Never edit an image tag by hand; Flux owns the lines with `{"$imagepolicy": ...}
 No secret is in Git. The passwords are in OpenBao under `kv/quiz/*`.
 External Secrets Operator turns them into Kubernetes Secrets, and the
 services get them as environment variables, e.g. `ConnectionStrings__Default`.
+The JWT signing key shared by UserService (signs) and the services that validate
+tokens is at `kv/quiz/jwt`, property `signing-key`, and arrives as `Jwt__SigningKey`.
 
 ### Adding or changing a secret in OpenBao
 

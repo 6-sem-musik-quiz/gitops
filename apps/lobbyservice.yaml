@@ -1,6 +1,7 @@
 # LobbyService: lobbies. No SQL database in the C4 design; active lobbies live in Redis.
 #
-# Secret: the Redis connection string, built from the password in OpenBao.
+# Secrets: the Redis connection string, built from the password in OpenBao, and the
+# JWT signing key (kv/quiz/jwt, the same key UserService signs its tokens with).
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -16,11 +17,16 @@ spec:
       engineVersion: v2
       data:
         ConnectionStrings__Redis: "redis-master.quiz.svc.cluster.local:6379,password={{ .redisPassword }}"
+        Jwt__SigningKey: "{{ .jwtSigningKey }}"
   data:
     - secretKey: redisPassword
       remoteRef:
         key: quiz/redis
         property: password
+    - secretKey: jwtSigningKey
+      remoteRef:
+        key: quiz/jwt
+        property: signing-key
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
