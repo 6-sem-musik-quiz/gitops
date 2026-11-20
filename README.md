@@ -95,7 +95,18 @@ player --GET--> media.munkcloud.dk (Cloudflare CDN) --cache miss--> Tunnel --> g
 - **Cache:** Cloudflare caches `media.munkcloud.dk` for a long time. Upload a changed
   file under a new key (e.g. `songs/<id>-<hash>.mp3`) instead of overwriting one.
 
-### One-time setup (after the first deploy, and again only on a fresh volume)
+### Cloudflare (set in the dashboard/API, not in this repo)
+
+- Tunnel `homelab`: route `media.munkcloud.dk` -> `http://garage.quiz.svc.cluster.local:3902`.
+- DNS: `media.munkcloud.dk` CNAME to the tunnel, proxied.
+- Cache rule "Slopster media (Garage)": host `media.munkcloud.dk` is cached at the edge
+  for 30 days and in browsers for 1 day, whatever Garage sends.
+- Tiered Cache (Smart Topology) is on for the zone, so a cache miss goes to Garage
+  roughly once per file instead of once per Cloudflare location.
+- Check: `curl -sI https://media.munkcloud.dk/test/cdn-test.txt` shows
+  `cf-cache-status: HIT` from the second request on.
+
+### One-time setup (done 2026-11-20; again only on a fresh volume)
 
 `--single-node` makes the cluster layout by itself. The bucket and MusicService's
 key are made once by hand. In PowerShell:
