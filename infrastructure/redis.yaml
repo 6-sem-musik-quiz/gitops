@@ -48,3 +48,17 @@ spec:
           memory: 64Mi
         limits:
           memory: 256Mi
+    # redis_exporter as a sidecar on :9121, scraped by the homelab Prometheus
+    # through the ServiceMonitor. Shows in Grafana (Quiz org): hit rate, memory,
+    # keys, clients, commands/s. The chart's NetworkPolicy opens 9121 for it.
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+      resourcesPreset: none
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 64Mi
