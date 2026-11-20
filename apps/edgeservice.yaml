@@ -20,5 +20,5 @@ spec:
   values:
     image:
       repository: ghcr.io/6-sem-musik-quiz/edgeservice
-      tag: 3-bc5e374a-1795082890 # {"$imagepolicy": "quiz:edgeservice:tag"}
+      tag: 6-d9ee39a9-1795193169 # {"$imagepolicy": "quiz:edgeservice:tag"}
     replicaCount: 2 # the single entry point: keep one pod up during a rollout
