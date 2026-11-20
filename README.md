@@ -109,4 +109,4 @@ kubectl -n quiz get secret postgresql-auth -o jsonpath="{.data.postgres-password
 
 In pgAdmin choose Register > Server and fill in: host `quiz-postgres.tail5a1bc5.ts.net`, port `5432`, maintenance DB `postgres`,
 username `postgres`, and the password from above. Each service has its own database
-(`userservice`, `lobbyservice`, `gameservice`, `musicservice`, `statisticservice`).
+(`userservice`, `musicservice`, `statisticservice`). LobbyService and GameService have none.

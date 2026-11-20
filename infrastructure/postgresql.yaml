@@ -1,6 +1,7 @@
-# One PostgreSQL server with one database and one user per service.
+# One PostgreSQL server with one database and one user per service that has a
+# database in the C4 design: UserDB, StatsDB and MusicDB.
 # Every password lives in OpenBao at kv/quiz/postgres:
-#   postgres-password, userservice, lobbyservice, gameservice, musicservice, statisticservice
+#   postgres-password, userservice, musicservice, statisticservice
 # Services reach it at postgresql.quiz.svc.cluster.local:5432.
 
 # The admin password for the chart.
@@ -40,10 +41,6 @@ spec:
         01-services.sql: |
           CREATE USER userservice WITH PASSWORD '{{ .userservice }}';
           CREATE DATABASE userservice OWNER userservice;
-          CREATE USER lobbyservice WITH PASSWORD '{{ .lobbyservice }}';
-          CREATE DATABASE lobbyservice OWNER lobbyservice;
-          CREATE USER gameservice WITH PASSWORD '{{ .gameservice }}';
-          CREATE DATABASE gameservice OWNER gameservice;
           CREATE USER musicservice WITH PASSWORD '{{ .musicservice }}';
           CREATE DATABASE musicservice OWNER musicservice;
           CREATE USER statisticservice WITH PASSWORD '{{ .statisticservice }}';
