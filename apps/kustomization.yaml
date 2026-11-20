@@ -7,6 +7,5 @@ resources:
   - musicservice.yaml
   - statisticservice.yaml
   - edgeservice.yaml
+  - frontend.yaml
   - image-automation.yaml
-  # Add this when its repo has a first image (and add it to image-automation.yaml):
-  # - frontend.yaml
