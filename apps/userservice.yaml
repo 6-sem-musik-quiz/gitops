@@ -40,6 +40,6 @@ spec:
   values:
     image:
       repository: ghcr.io/6-sem-musik-quiz/userservice
-      tag: 17-b15efc4b-1795179968 # {"$imagepolicy": "quiz:userservice:tag"}
+      tag: 21-26377aa6-1795193448 # {"$imagepolicy": "quiz:userservice:tag"}
     envFromSecrets:
       - userservice-secrets
