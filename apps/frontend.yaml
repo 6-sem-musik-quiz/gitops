@@ -20,10 +20,10 @@ spec:
   values:
     image:
       repository: ghcr.io/6-sem-musik-quiz/frontend
-      tag: 0-00000000-0 # {"$imagepolicy": "quiz:frontend:tag"}
+      tag: 8-72af6b89-1795187882 # {"$imagepolicy": "quiz:frontend:tag"}
     runAsUser: 101
     otel:
-      enabled: false   # static files: nothing to trace on the server
+      enabled: false # static files: nothing to trace on the server
     resources:
       requests:
         cpu: 20m
