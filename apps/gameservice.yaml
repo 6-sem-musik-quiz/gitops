@@ -1,6 +1,8 @@
 # GameService: runs the games, publishes results to RabbitMQ. No SQL database in the C4 design.
 #
-# Secret: the RabbitMQ settings, built from the passwords in OpenBao.
+# Secrets: the RabbitMQ settings, built from the passwords in OpenBao, and the JWT signing key
+# (kv/quiz/jwt, the same key UserService signs its tokens with). Without the key every request
+# and hub connection gets 401, so LobbyService cannot create games.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -18,6 +20,7 @@ spec:
         RabbitMQ__Host: "rabbitmq.quiz.svc.cluster.local"
         RabbitMQ__Username: "{{ .rabbitUser }}"
         RabbitMQ__Password: "{{ .rabbitPassword }}"
+        Jwt__SigningKey: "{{ .jwtSigningKey }}"
   data:
     - secretKey: rabbitUser
       remoteRef:
@@ -27,6 +30,10 @@ spec:
       remoteRef:
         key: quiz/rabbitmq
         property: password
+    - secretKey: jwtSigningKey
+      remoteRef:
+        key: quiz/jwt
+        property: signing-key
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
@@ -45,5 +52,11 @@ spec:
     image:
       repository: ghcr.io/6-sem-musik-quiz/gameservice
       tag: 25-53956c5d-1795553943 # {"$imagepolicy": "quiz:gameservice:tag"}
+    env:
+      # Called inside the cluster (not through the edge) for the songs of a new game:
+      # GET /api/playlists/{id}/songs/random. Without it the app falls back to its local-dev
+      # default (localhost:5002) and every game start fails with 502.
+      Services__MusicService: http://musicservice.quiz.svc.cluster.local:8080/
+    # One pod on purpose: games are kept in memory (see README, Autoscaling).
     envFromSecrets:
       - gameservice-secrets
