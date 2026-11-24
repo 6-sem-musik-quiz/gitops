@@ -50,7 +50,7 @@ spec:
   values:
     image:
       repository: ghcr.io/6-sem-musik-quiz/musicservice
-      tag: 15-73d48081-1795209685 # {"$imagepolicy": "quiz:musicservice:tag"}
+      tag: 17-78d142e5-1795517200 # {"$imagepolicy": "quiz:musicservice:tag"}
     env:
       BlobStorage__ServiceUrl: http://garage.quiz.svc.cluster.local:3900
       BlobStorage__Bucket: media
