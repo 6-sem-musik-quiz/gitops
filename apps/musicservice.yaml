@@ -56,3 +56,5 @@ spec:
       BlobStorage__Bucket: media
     envFromSecrets:
       - musicservice-secrets
+    autoscaling:
+      enabled: true # stateless: HPA on CPU (chart defaults: 2-5 pods, 70 %)

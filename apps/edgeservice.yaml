@@ -21,4 +21,5 @@ spec:
     image:
       repository: ghcr.io/6-sem-musik-quiz/edgeservice
       tag: 6-d9ee39a9-1795193169 # {"$imagepolicy": "quiz:edgeservice:tag"}
-    replicaCount: 2 # the single entry point: keep one pod up during a rollout
+    autoscaling:
+      enabled: true # min 2: the single entry point keeps one pod up during a rollout
