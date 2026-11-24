@@ -1,6 +1,7 @@
 # MusicService: songs and playlists. Database: musicservice. Song files: Garage (infrastructure/garage.yaml, README "BlobStorage").
 #
-# Secret: the connection strings and the S3 key for Garage, from OpenBao.
+# Secret: the connection strings, the S3 key for Garage and the JWT signing key
+# (kv/quiz/jwt, the same key UserService signs its tokens with), from OpenBao.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -18,6 +19,7 @@ spec:
         ConnectionStrings__Default: "Host=postgresql.quiz.svc.cluster.local;Port=5432;Database=musicservice;Username=musicservice;Password={{ .dbPassword }}"
         BlobStorage__AccessKeyId: "{{ .blobAccessKeyId }}"
         BlobStorage__SecretAccessKey: "{{ .blobSecretAccessKey }}"
+        Jwt__SigningKey: "{{ .jwtSigningKey }}"
   data:
     - secretKey: dbPassword
       remoteRef:
@@ -31,6 +33,10 @@ spec:
       remoteRef:
         key: quiz/blobstorage
         property: secret-access-key
+    - secretKey: jwtSigningKey
+      remoteRef:
+        key: quiz/jwt
+        property: signing-key
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
@@ -54,6 +60,7 @@ spec:
     env:
       BlobStorage__ServiceUrl: http://garage.quiz.svc.cluster.local:3900
       BlobStorage__Bucket: media
+      BlobStorage__PublicBaseUrl: https://media.munkcloud.dk # Cloudflare CDN in front of the bucket
     envFromSecrets:
       - musicservice-secrets
     autoscaling:
