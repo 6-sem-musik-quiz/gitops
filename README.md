@@ -131,6 +131,67 @@ More nodes: turn off `singleNode`, set `deployment.replicaCount` and
 Garage then spreads the 256 partitions over the nodes (Z-axis) and keeps 3 copies of
 each (X-axis). Reads mostly never reach Garage: the CDN serves them.
 
+## Autoscaling (HPA)
+
+The stateless services scale out by themselves (X-axis): a
+`HorizontalPodAutoscaler` adds pods when their CPU is high and removes them
+when it is low. Turned on for `frontend`, `edgeservice`, `userservice`,
+`musicservice` and `statisticservice`. Not for `lobbyservice` (SignalR needs a
+Redis backplane first, SCRUM-128) or `gameservice` (keeps game state in memory).
+
+Values in `charts/quiz-service` (set per service in `apps/<service>.yaml`):
+
+| Value | Default | Meaning |
+|---|---|---|
+| `autoscaling.enabled` | `false` | `true` makes an HPA and leaves `replicas` out of the Deployment, so Flux does not reset the HPA's pod count. `false` = fixed `replicaCount` as before. |
+| `autoscaling.minReplicas` | `2` | pods when idle (2, so one can die or roll out without downtime) |
+| `autoscaling.maxReplicas` | `5` | upper limit per service |
+| `autoscaling.targetCPUUtilizationPercentage` | `70` | average CPU use in % of `resources.requests.cpu` that the HPA aims for |
+| `autoscaling.scaleDownStabilizationSeconds` | `120` | low load this long before pods are removed (Kubernetes' default is 300) |
+
+The HPA counts in percent of the **CPU request**, so a service needs one (the
+chart gives 50m; the frontend 20m). With 50m, 70 % means the HPA adds a pod when
+the pods use more than 35m CPU on average. It reads CPU from metrics-server (part of k3s).
+
+### Resource math
+
+The namespace has no ResourceQuota anymore (the homelab only runs the quiz), so
+the limit is the node: 1 k3s node with 5 CPU and about 19.5 GiB allocatable.
+At the maximum (5 pods for each of the 5 services):
+
+| | per pod (request / memory limit) | × 5 pods × services | total request | total memory limit |
+|---|---|---|---|---|
+| 4 .NET services | 50m CPU, 96Mi / 256Mi | × 5 × 4 = 20 pods | 1000m, 1920Mi | 5120Mi |
+| frontend (nginx) | 20m CPU, 32Mi / 128Mi | × 5 × 1 = 5 pods | 100m, 160Mi | 640Mi |
+| **all at max** | | 25 pods | **1.1 CPU, 2.0 GiB** | **5.6 GiB** |
+| idle (min 2 each) | | 10 pods | 0.44 CPU, 0.8 GiB | 2.3 GiB |
+
+That fits next to Postgres, Redis, RabbitMQ and Garage and the homelab's own
+pods. Requests are what the scheduler reserves; CPU has no limit, so a busy pod
+can use free CPU on the node (and the HPA still sees it as > 100 %).
+More nodes would only raise `maxReplicas`; the services need no change.
+
+### See it scale
+
+Grafana (Quiz org) → dashboard **Slopster Autoscaling**: pods per service (ready
+and what the HPA wants), CPU in % of the request with the 70 % line, and CPU and
+memory per pod. The dashboard lives in the homelab repo
+(`infrastructure/monitoring/dashboards/quiz-autoscaling.json`).
+
+Load test from inside the cluster (no Cloudflare in between), e.g. 2 minutes
+with 50 parallel clients against the edge:
+
+```powershell
+kubectl -n quiz get hpa
+kubectl -n quiz run hey --rm -it --restart=Never --image=williamyeh/hey -- -z 2m -c 50 http://edgeservice:8080/health
+kubectl -n quiz get hpa -w      # in a second terminal: REPLICAS goes up, and about 2 minutes after the test back to 2
+```
+
+Swap `edgeservice` for `userservice`, `musicservice`, `statisticservice` or
+`frontend:8080/` to test another one. Through the edge,
+`https://quiz.munkcloud.dk/api/edge/health` works too, but Cloudflare may block or
+slow down a load test from one IP.
+
 ## What the services must do
 
 - Listen on 8080 and answer `GET /health` (they do already).
@@ -147,6 +208,7 @@ kubectl logs deploy/userservice
 kubectl port-forward svc/rabbitmq 15672:15672        # RabbitMQ UI on localhost:15672
 kubectl port-forward svc/userservice 8080:8080       # call one service directly
 kubectl get helmreleases                             # did Flux install everything?
+kubectl get hpa                                      # autoscaling: pods now / min / max per service
 ```
 
 ## Postgres in pgAdmin

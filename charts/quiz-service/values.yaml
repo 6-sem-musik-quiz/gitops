@@ -5,7 +5,17 @@ image:
   tag: ""               # set by Flux image automation
   pullPolicy: IfNotPresent
 
-replicaCount: 1
+replicaCount: 1         # ignored when autoscaling.enabled is true
+
+# HorizontalPodAutoscaler (autoscaling/v2) on CPU. Only for stateless services:
+# lobbyservice (SignalR) and gameservice (state in memory) keep it off.
+# The percentage is of resources.requests.cpu, so a service needs a cpu request.
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  scaleDownStabilizationSeconds: 120
 
 # The container listens on this port. The Service uses the same port,
 # so other pods call http://<name>:8080.

@@ -43,3 +43,5 @@ spec:
       tag: 23-778e0283-1795513225 # {"$imagepolicy": "quiz:userservice:tag"}
     envFromSecrets:
       - userservice-secrets
+    autoscaling:
+      enabled: true # stateless: HPA on CPU (chart defaults: 2-5 pods, 70 %)
