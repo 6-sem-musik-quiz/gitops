@@ -1,6 +1,8 @@
 # UserService: login, profiles. Database: userservice.
 #
-# Secret: the connection strings, built from the passwords in OpenBao.
+# Secrets: the connection strings, built from the passwords in OpenBao, and the
+# JWT signing key (kv/quiz/jwt) that UserService signs its tokens with. The
+# other services validate tokens with the same key.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -16,11 +18,16 @@ spec:
       engineVersion: v2
       data:
         ConnectionStrings__Default: "Host=postgresql.quiz.svc.cluster.local;Port=5432;Database=userservice;Username=userservice;Password={{ .dbPassword }}"
+        Jwt__SigningKey: "{{ .jwtSigningKey }}"
   data:
     - secretKey: dbPassword
       remoteRef:
         key: quiz/postgres
         property: userservice
+    - secretKey: jwtSigningKey
+      remoteRef:
+        key: quiz/jwt
+        property: signing-key
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
