@@ -20,7 +20,7 @@ spec:
   values:
     image:
       repository: ghcr.io/6-sem-musik-quiz/frontend
-      tag: 38-9eb3205d-1795559515 # {"$imagepolicy": "quiz:frontend:tag"}
+      tag: 41-c64b0ff4-1795560951 # {"$imagepolicy": "quiz:frontend:tag"}
     runAsUser: 101
     autoscaling:
       enabled: true # stateless: HPA on CPU (chart defaults: 2-5 pods, 70 %)
