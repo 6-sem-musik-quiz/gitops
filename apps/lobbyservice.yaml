@@ -49,5 +49,11 @@ spec:
       tag: 29-32ef15e2-1795525327 # {"$imagepolicy": "quiz:lobbyservice:tag"}
     probes:
       readinessPath: /health/ready # ready only when Redis answers
+    env:
+      # Called inside the cluster (not through the edge): the playlist check when a lobby is
+      # created, and POST /api/games when the host starts the game. Without these the app
+      # falls back to its local-dev defaults (localhost:5002/5005) and every call fails.
+      MusicService__BaseUrl: http://musicservice.quiz.svc.cluster.local:8080/
+      Services__GameService: http://gameservice.quiz.svc.cluster.local:8080/
     envFromSecrets:
       - lobbyservice-secrets
