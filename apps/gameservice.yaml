@@ -44,6 +44,6 @@ spec:
   values:
     image:
       repository: ghcr.io/6-sem-musik-quiz/gameservice
-      tag: 8-13e99d31-1795085970 # {"$imagepolicy": "quiz:gameservice:tag"}
+      tag: 10-dc091d20-1795517250 # {"$imagepolicy": "quiz:gameservice:tag"}
     envFromSecrets:
       - gameservice-secrets
