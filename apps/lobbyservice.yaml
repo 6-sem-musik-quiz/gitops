@@ -46,7 +46,7 @@ spec:
   values:
     image:
       repository: ghcr.io/6-sem-musik-quiz/lobbyservice
-      tag: 22-e55a1c5c-1795517236 # {"$imagepolicy": "quiz:lobbyservice:tag"}
+      tag: 25-1882a160-1795521916 # {"$imagepolicy": "quiz:lobbyservice:tag"}
     probes:
       readinessPath: /health/ready # ready only when Redis answers
     envFromSecrets:
