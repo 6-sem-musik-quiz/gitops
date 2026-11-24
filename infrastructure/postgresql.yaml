@@ -63,6 +63,17 @@ spec:
         kind: HelmRepository
         name: bitnami
   values:
+    # Same Bitnami PostgreSQL 18.7 base, pgvector 0.8.7 rebuilt with OPTFLAGS="".
+    # Pin the exact locally smoke-tested artifact; see images/postgresql/README.md.
+    global:
+      security:
+        # Required by this chart for a custom image; scoped to this release.
+        allowInsecureImages: true
+    image:
+      registry: ghcr.io
+      repository: 6-sem-musik-quiz/postgresql
+      tag: "18.7-vector-portable"
+      digest: "sha256:3d305874bd1cabd9db95fd78ae75323ec6891ca63709cc4541951cad24c2f289"
     auth:
       existingSecret: postgresql-auth
       secretKeys:
