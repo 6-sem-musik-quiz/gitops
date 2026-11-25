@@ -8,6 +8,8 @@
 # User and password in OpenBao at kv/quiz/rabbitmq (properties: username, password).
 # Services reach it at rabbitmq.quiz.svc.cluster.local:5672.
 # Management UI: kubectl port-forward -n quiz svc/rabbitmq 15672:15672
+# Metrics (SCRUM-192): the image's rabbitmq_prometheus plugin on port 15692, scraped by
+# the ServiceMonitor at the bottom. Grafana: "Slopster RabbitMQ" in the Quiz org.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -45,6 +47,11 @@ spec:
     - name: management
       port: 15672
       targetPort: management
+    # By number, not a named containerPort: adding a port to the StatefulSet would
+    # restart rabbitmq-0, and games finishing meanwhile would lose their result.
+    - name: prometheus
+      port: 15692
+      targetPort: 15692
 ---
 # Headless Service: gives the StatefulSet pod a stable DNS name.
 apiVersion: v1
@@ -137,3 +144,31 @@ spec:
         resources:
           requests:
             storage: 2Gi
+---
+# Prometheus (kube-prometheus-stack) picks up ServiceMonitors in every namespace.
+# Two scrapes of the same port:
+# - /metrics: node-wide totals (messages received / routed / dropped as unroutable,
+#   delivered, acked, connections, channels, memory). Per-queue data is off by default.
+# - /metrics/detailed: only the two per-queue families the dashboard needs
+#   (ready / unacked / total messages and consumers per queue).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: rabbitmq
+  labels:
+    app.kubernetes.io/name: rabbitmq
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rabbitmq
+  endpoints:
+    - port: prometheus
+      path: /metrics
+      interval: 30s
+    - port: prometheus
+      path: /metrics/detailed
+      params:
+        family:
+          - queue_coarse_metrics
+          - queue_consumer_count
+      interval: 30s
