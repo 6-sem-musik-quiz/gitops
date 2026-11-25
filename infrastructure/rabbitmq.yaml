@@ -8,6 +8,8 @@
 # User and password in OpenBao at kv/quiz/rabbitmq (properties: username, password).
 # Services reach it at rabbitmq.quiz.svc.cluster.local:5672.
 # Management UI: kubectl port-forward -n quiz svc/rabbitmq 15672:15672
+# Metrics (SCRUM-192): the image's rabbitmq_prometheus plugin on port 15692, scraped by
+# the ServiceMonitor at the bottom. Grafana: "Slopster RabbitMQ" in the Quiz org.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -45,6 +47,27 @@ spec:
     - name: management
       port: 15672
       targetPort: management
+    # The rabbitmq_prometheus plugin's port; the container does not list it.
+    - name: prometheus
+      port: 15692
+      targetPort: 15692
+---
+# Without this RabbitMQ sizes itself from the node's RAM (~12.5 GB), not the pod's
+# 512Mi limit, so the pod is OOM-killed long before RabbitMQ's memory alarm would
+# block publishers. With it, the alarm trips at 0.6 x 512Mi (vm_memory_high_watermark
+# default) and publishers wait instead of the broker dying.
+# Keep the value equal to resources.limits.memory below. RabbitMQ reads it at startup
+# and a subPath mount is not updated live: restart rabbitmq-0 after changing it.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbitmq-config
+  labels:
+    app.kubernetes.io/name: rabbitmq
+data:
+  20-memory.conf: |
+    # 512 MiB in bytes, the pod's memory limit.
+    total_memory_available_override_value = 536870912
 ---
 # Headless Service: gives the StatefulSet pod a stable DNS name.
 apiVersion: v1
@@ -129,6 +152,15 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/rabbitmq
+            # One extra file next to the image's 10-defaults.conf (both are read).
+            - name: config
+              mountPath: /etc/rabbitmq/conf.d/20-memory.conf
+              subPath: 20-memory.conf
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: rabbitmq-config
   volumeClaimTemplates:
     - metadata:
         name: data
@@ -137,3 +169,31 @@ spec:
         resources:
           requests:
             storage: 2Gi
+---
+# Prometheus (kube-prometheus-stack) picks up ServiceMonitors in every namespace.
+# Two scrapes of the same port:
+# - /metrics: node-wide totals (messages received / routed / dropped as unroutable,
+#   delivered, acked, connections, channels, memory). Per-queue data is off by default.
+# - /metrics/detailed: only the two per-queue families the dashboard needs
+#   (ready / unacked / total messages and consumers per queue).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: rabbitmq
+  labels:
+    app.kubernetes.io/name: rabbitmq
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rabbitmq
+  endpoints:
+    - port: prometheus
+      path: /metrics
+      interval: 30s
+    - port: prometheus
+      path: /metrics/detailed
+      params:
+        family:
+          - queue_coarse_metrics
+          - queue_consumer_count
+      interval: 30s
