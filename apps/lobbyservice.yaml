@@ -1,7 +1,10 @@
 # LobbyService: lobbies. No SQL database in the C4 design; active lobbies live in Redis.
 #
-# Secrets: the Redis connection string, built from the password in OpenBao, and the
-# JWT signing key (kv/quiz/jwt, the same key UserService signs its tokens with).
+# Secrets: the Redis connection string, built from the password in OpenBao, the
+# JWT signing key (kv/quiz/jwt, the same key UserService signs its tokens with) and the
+# RabbitMQ login (kv/quiz/rabbitmq, as StatisticService). SCRUM-172: LobbyService consumes
+# GameService's GameFinished from its own queue lobbyservice.game-finished and reopens the
+# lobby for "Spil igen".
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -18,6 +21,9 @@ spec:
       data:
         ConnectionStrings__Redis: "redis-master.quiz.svc.cluster.local:6379,password={{ .redisPassword }}"
         Jwt__SigningKey: "{{ .jwtSigningKey }}"
+        RabbitMQ__Host: "rabbitmq.quiz.svc.cluster.local"
+        RabbitMQ__Username: "{{ .rabbitUser }}"
+        RabbitMQ__Password: "{{ .rabbitPassword }}"
   data:
     - secretKey: redisPassword
       remoteRef:
@@ -27,6 +33,14 @@ spec:
       remoteRef:
         key: quiz/jwt
         property: signing-key
+    - secretKey: rabbitUser
+      remoteRef:
+        key: quiz/rabbitmq
+        property: username
+    - secretKey: rabbitPassword
+      remoteRef:
+        key: quiz/rabbitmq
+        property: password
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
