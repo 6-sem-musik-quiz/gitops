@@ -11,8 +11,8 @@ kind: ExternalSecret
 metadata:
   name: statisticservice-secrets
 spec:
-  refreshInterval: 1h               # read OpenBao again every hour
-  secretStoreRef:                   # where the values come from: OpenBao
+  refreshInterval: 1h # read OpenBao again every hour
+  secretStoreRef: # where the values come from: OpenBao
     kind: SecretStore
     name: openbao
   target:
@@ -51,19 +51,19 @@ kind: HelmRelease
 metadata:
   name: statisticservice
 spec:
-  interval: 10m                     # how often Flux checks that the release matches Git
-  dependsOn:                        # deploy only after postgresql is ready
+  interval: 10m # how often Flux checks that the release matches Git
+  dependsOn: # deploy only after postgresql is ready
     - name: postgresql
   chart:
     spec:
-      chart: ./charts/quiz-service    # our own chart, from this repo
-      reconcileStrategy: Revision     # a chart change in Git is picked up without a version bump
+      chart: ./charts/quiz-service # our own chart, from this repo
+      reconcileStrategy: Revision # a chart change in Git is picked up without a version bump
       sourceRef:
-        kind: GitRepository           # this repo, as Flux knows it
+        kind: GitRepository # this repo, as Flux knows it
         name: quiz
-  values:                           # overrides charts/quiz-service/values.yaml
+  values: # overrides charts/quiz-service/values.yaml
     image:
       repository: ghcr.io/6-sem-musik-quiz/statisticservice
-      tag: 37-f6796ce2-1795712613 # {"$imagepolicy": "quiz:statisticservice:tag"}
-    envFromSecrets:                   # the Secret made by the ExternalSecret above
+      tag: 39-75b4bea2-1795733824 # {"$imagepolicy": "quiz:statisticservice:tag"}
+    envFromSecrets: # the Secret made by the ExternalSecret above
       - statisticservice-secrets
