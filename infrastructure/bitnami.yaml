@@ -5,6 +5,6 @@ kind: HelmRepository
 metadata:
   name: bitnami
 spec:
-  type: oci
+  type: oci                                       # the charts are stored as OCI images
   url: oci://registry-1.docker.io/bitnamicharts
-  interval: 12h
+  interval: 12h                                   # how often Flux checks for new chart versions

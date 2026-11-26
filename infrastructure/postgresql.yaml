@@ -58,32 +58,28 @@ spec:
   chart:
     spec:
       chart: postgresql
-      version: "18.12.20"
+      version: "18.12.20"             # pinned: a new chart version is a deliberate change
       sourceRef:
         kind: HelmRepository
         name: bitnami
   values:
-    # Same Bitnami PostgreSQL 18.7 base, pgvector 0.8.7 rebuilt with OPTFLAGS="".
-    # Pin the exact locally smoke-tested artifact; see images/postgresql/README.md.
-    global:
-      security:
-        # Required by this chart for a custom image; scoped to this release.
-        allowInsecureImages: true
+    # Bitnami's PostgreSQL 18.7 image, pinned by digest. The chart's default is the
+    # "latest" tag, which would move to a new PostgreSQL version on its own.
+    # A digest always means the same image; change it on purpose to upgrade.
     image:
-      registry: ghcr.io
-      repository: 6-sem-musik-quiz/postgresql
-      tag: "18.7-vector-portable"
-      digest: "sha256:3d305874bd1cabd9db95fd78ae75323ec6891ca63709cc4541951cad24c2f289"
-    auth:
+      registry: registry-1.docker.io
+      repository: bitnami/postgresql
+      digest: "sha256:ec2ef1dfb067c66aa83081405438e80786b4fae4647ca94330e0fc94398b9207"
+    auth:                              # the admin password from the first ExternalSecret
       existingSecret: postgresql-auth
       secretKeys:
         adminPasswordKey: postgres-password
     primary:
       initdb:
-        scriptsSecret: postgresql-initdb
+        scriptsSecret: postgresql-initdb   # the first-boot SQL from the second ExternalSecret
       persistence:
-        size: 5Gi
-      resourcesPreset: none
+        size: 5Gi                      # the disk with all three databases
+      resourcesPreset: none            # use our own requests and limits below
       resources:
         requests:
           cpu: 100m
@@ -106,9 +102,9 @@ metadata:
     tailscale.com/tags: tag:quiz-postgres
 spec:
   type: LoadBalancer
-  loadBalancerClass: tailscale
+  loadBalancerClass: tailscale         # the Tailscale operator makes the tailnet address
   allocateLoadBalancerNodePorts: false # node ports are not allowed in quiz
-  selector:
+  selector:                            # the Postgres pod made by the chart
     app.kubernetes.io/component: primary
     app.kubernetes.io/instance: postgresql
     app.kubernetes.io/name: postgresql

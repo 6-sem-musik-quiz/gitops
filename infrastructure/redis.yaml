@@ -1,7 +1,10 @@
-# Redis: the cache for LobbyService (and later the SignalR backplane).
-# Same setup as the class file redis-values.yaml: one master, no disk.
+# Redis: the active lobbies (LobbyService), the running games (GameService, ADR-0004)
+# and the SignalR backplane for both. Same setup as the class file redis-values.yaml:
+# one instance, no disk.
 # Password in OpenBao at kv/quiz/redis (property: password).
 # Services reach it at redis-master.quiz.svc.cluster.local:6379.
+
+# The password, from OpenBao, as the Secret the chart reads.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -28,20 +31,20 @@ spec:
   chart:
     spec:
       chart: redis
-      version: "28.3.12"
+      version: "28.3.12"              # pinned: a new chart version is a deliberate change
       sourceRef:
         kind: HelmRepository
         name: bitnami
   values:
-    architecture: standalone
-    auth:
+    architecture: standalone           # one instance, no replicas
+    auth:                              # password from the Secret above
       enabled: true
       existingSecret: redis-auth
       existingSecretPasswordKey: redis-password
     master:
       persistence:
-        enabled: false   # a cache can be lost on restart
-      resourcesPreset: none
+        enabled: false   # no disk: after a Redis restart the lobbies and running games are gone (ADR-0004)
+      resourcesPreset: none            # use our own requests and limits below
       resources:
         requests:
           cpu: 50m

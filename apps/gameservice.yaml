@@ -1,6 +1,6 @@
 # GameService: runs the games, publishes results to RabbitMQ. No SQL database in the C4 design.
 # ADR-0004: the running games are in Redis (the same as LobbyService's), so GameService is stateless
-# and autoscales like the other services; any pod can serve any game.
+# and autoscales like the other services (chart HPA, 2-5 pods); any pod can serve any game.
 #
 # Secrets: the RabbitMQ settings and the Redis connection string, built from the passwords in OpenBao,
 # and the JWT signing key (kv/quiz/jwt, the same key UserService signs its tokens with). Without the
@@ -10,12 +10,14 @@ kind: ExternalSecret
 metadata:
   name: gameservice-secrets
 spec:
-  refreshInterval: 1h
-  secretStoreRef:
+  refreshInterval: 1h               # read OpenBao again every hour
+  secretStoreRef:                   # where the values come from: OpenBao
     kind: SecretStore
     name: openbao
   target:
     name: gameservice-secrets
+    # The Secret's keys, built from the values fetched under "data" below.
+    # Each key becomes an environment variable in the pod (envFromSecrets).
     template:
       engineVersion: v2
       data:
@@ -24,6 +26,7 @@ spec:
         RabbitMQ__Password: "{{ .rabbitPassword }}"
         Jwt__SigningKey: "{{ .jwtSigningKey }}"
         ConnectionStrings__Redis: "redis-master.quiz.svc.cluster.local:6379,password={{ .redisPassword }}"
+  # Values fetched from OpenBao: secretKey = the name used in the template above.
   data:
     - secretKey: redisPassword
       remoteRef:
@@ -47,17 +50,17 @@ kind: HelmRelease
 metadata:
   name: gameservice
 spec:
-  interval: 10m
-  dependsOn:
+  interval: 10m                     # how often Flux checks that the release matches Git
+  dependsOn:                        # deploy only after redis is ready
     - name: redis
   chart:
     spec:
-      chart: ./charts/quiz-service
-      reconcileStrategy: Revision # a chart change in Git is picked up without a version bump
+      chart: ./charts/quiz-service    # our own chart, from this repo
+      reconcileStrategy: Revision     # a chart change in Git is picked up without a version bump
       sourceRef:
-        kind: GitRepository
+        kind: GitRepository           # this repo, as Flux knows it
         name: quiz
-  values:
+  values:                           # overrides charts/quiz-service/values.yaml
     image:
       repository: ghcr.io/6-sem-musik-quiz/gameservice
       tag: 47-a7f98629-1795708897 # {"$imagepolicy": "quiz:gameservice:tag"}
@@ -68,8 +71,5 @@ spec:
       Services__MusicService: http://musicservice.quiz.svc.cluster.local:8080/
     probes:
       readinessPath: /health/ready # ready only when Redis answers
-    # X-axis: the games are in Redis, so pods are interchangeable (min 2: one can die or roll out).
-    autoscaling:
-      enabled: true
-    envFromSecrets:
+    envFromSecrets:                   # the Secret made by the ExternalSecret above
       - gameservice-secrets

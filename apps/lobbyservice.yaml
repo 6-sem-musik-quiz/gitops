@@ -5,17 +5,23 @@
 # RabbitMQ login (kv/quiz/rabbitmq, as StatisticService). SCRUM-172: LobbyService consumes
 # GameService's GameFinished from its own queue lobbyservice.game-finished and reopens the
 # lobby for "Spil igen".
+#
+# Autoscaled by the chart's HPA (2-5 pods on CPU). Possible since SCRUM-128: SignalR uses
+# Redis as backplane, so a lobby update reaches players on every pod, and the hub is
+# WebSockets-only without negotiate, so a connection never spans two pods.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
   name: lobbyservice-secrets
 spec:
-  refreshInterval: 1h
-  secretStoreRef:
+  refreshInterval: 1h               # read OpenBao again every hour
+  secretStoreRef:                   # where the values come from: OpenBao
     kind: SecretStore
     name: openbao
   target:
     name: lobbyservice-secrets
+    # The Secret's keys, built from the values fetched under "data" below.
+    # Each key becomes an environment variable in the pod (envFromSecrets).
     template:
       engineVersion: v2
       data:
@@ -24,6 +30,7 @@ spec:
         RabbitMQ__Host: "rabbitmq.quiz.svc.cluster.local"
         RabbitMQ__Username: "{{ .rabbitUser }}"
         RabbitMQ__Password: "{{ .rabbitPassword }}"
+  # Values fetched from OpenBao: secretKey = the name used in the template above.
   data:
     - secretKey: redisPassword
       remoteRef:
@@ -47,17 +54,17 @@ kind: HelmRelease
 metadata:
   name: lobbyservice
 spec:
-  interval: 10m
-  dependsOn:
+  interval: 10m                     # how often Flux checks that the release matches Git
+  dependsOn:                        # deploy only after redis is ready
     - name: redis
   chart:
     spec:
-      chart: ./charts/quiz-service
-      reconcileStrategy: Revision # a chart change in Git is picked up without a version bump
+      chart: ./charts/quiz-service    # our own chart, from this repo
+      reconcileStrategy: Revision     # a chart change in Git is picked up without a version bump
       sourceRef:
-        kind: GitRepository
+        kind: GitRepository           # this repo, as Flux knows it
         name: quiz
-  values:
+  values:                           # overrides charts/quiz-service/values.yaml
     image:
       repository: ghcr.io/6-sem-musik-quiz/lobbyservice
       tag: 45-24086616-1795710680 # {"$imagepolicy": "quiz:lobbyservice:tag"}
@@ -69,11 +76,5 @@ spec:
       # falls back to its local-dev defaults (localhost:5002/5005) and every call fails.
       MusicService__BaseUrl: http://musicservice.quiz.svc.cluster.local:8080/
       Services__GameService: http://gameservice.quiz.svc.cluster.local:8080/
-    envFromSecrets:
+    envFromSecrets:                   # the Secret made by the ExternalSecret above
       - lobbyservice-secrets
-    # Kept away from the image tag above, which Flux rewrites ("Update images"), so the two never conflict.
-    autoscaling:
-      # HPA on CPU (chart defaults: 2-5 pods, 70 %). Possible since SCRUM-128: SignalR uses Redis as
-      # backplane, so a lobby update reaches players on every pod, and the hub is WebSockets-only
-      # without negotiate, so a connection never spans two pods.
-      enabled: true

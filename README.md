@@ -135,8 +135,8 @@ each (X-axis). Reads mostly never reach Garage: the CDN serves them.
 
 The stateless services scale out by themselves (X-axis): a
 `HorizontalPodAutoscaler` adds pods when their CPU is high and removes them
-when it is low. Turned on for `frontend`, `edgeservice`, `userservice`,
-`musicservice`, `statisticservice`, `lobbyservice` and `gameservice`. `lobbyservice` holds
+when it is low. Every service deployed with the chart has one: `frontend`, `edgeservice`,
+`userservice`, `musicservice`, `statisticservice`, `lobbyservice` and `gameservice`. `lobbyservice` holds
 SignalR connections, so it uses Redis as SignalR backplane and a WebSockets-only
 hub without negotiate (SCRUM-128, see the LobbyService README). `gameservice`
 does the same and keeps its games in Redis (ADR-0004), so it has an HPA too.
@@ -146,11 +146,11 @@ the game, a lock per game and the game's timers (as deadlines all pods poll), pl
 backplane. So it is stateless like the others and has an HPA; a pod can die or roll out without ending
 games (players reconnect to another pod). `ConnectionStrings__Redis` comes from `gameservice-secrets`.
 
-Values in `charts/quiz-service` (set per service in `apps/<service>.yaml`):
+Values in `charts/quiz-service` (a service can override them in `apps/<service>.yaml`).
+The Deployment has no `replicas`, so Flux never resets the HPA's pod count:
 
 | Value | Default | Meaning |
 |---|---|---|
-| `autoscaling.enabled` | `false` | `true` makes an HPA and leaves `replicas` out of the Deployment, so Flux does not reset the HPA's pod count. `false` = fixed `replicaCount` as before. |
 | `autoscaling.minReplicas` | `2` | pods when idle (2, so one can die or roll out without downtime) |
 | `autoscaling.maxReplicas` | `5` | upper limit per service |
 | `autoscaling.targetCPUUtilizationPercentage` | `70` | average CPU use in % of `resources.requests.cpu` that the HPA aims for |

@@ -4,22 +4,21 @@
 # to http://<service>:8080/api/<rest>, e.g. /api/userservice/users/1 -> userservice
 # /api/users/1. The edge's own endpoints are under /api/edge.
 # The routes live in the EdgeService repo (appsettings.json), not here.
+# Autoscaled by the chart's HPA (2-5 pods): the single entry point keeps one pod up during a rollout.
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: edgeservice
 spec:
-  interval: 10m
+  interval: 10m                     # how often Flux checks that the release matches Git
   chart:
     spec:
-      chart: ./charts/quiz-service
-      reconcileStrategy: Revision
+      chart: ./charts/quiz-service    # our own chart, from this repo
+      reconcileStrategy: Revision     # a chart change in Git is picked up without a version bump
       sourceRef:
-        kind: GitRepository
+        kind: GitRepository           # this repo, as Flux knows it
         name: quiz
-  values:
+  values:                           # overrides charts/quiz-service/values.yaml
     image:
       repository: ghcr.io/6-sem-musik-quiz/edgeservice
       tag: 20-309e97e3-1795708919 # {"$imagepolicy": "quiz:edgeservice:tag"}
-    autoscaling:
-      enabled: true # min 2: the single entry point keeps one pod up during a rollout

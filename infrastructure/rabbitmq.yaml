@@ -1,5 +1,6 @@
-# RabbitMQ: the message queue between GameService (publishes game results)
-# and StatisticService (consumes them).
+# RabbitMQ: the message queue for GameFinished. GameService publishes it to the
+# exchange "game-events"; StatisticService (statistics) and LobbyService (reopen the
+# lobby) each read it from their own queue.
 #
 # Plain YAML, not a Bitnami chart: Bitnami removed its RabbitMQ image from
 # Docker Hub in 2025 (only an unpatched copy from August 2025 is left in
@@ -10,6 +11,8 @@
 # Management UI: kubectl port-forward -n quiz svc/rabbitmq 15672:15672
 # Metrics (SCRUM-192): the image's rabbitmq_prometheus plugin on port 15692, scraped by
 # the ServiceMonitor at the bottom. Grafana: "Slopster RabbitMQ" in the Quiz org.
+
+# User and password from OpenBao, read by the container below.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -31,6 +34,7 @@ spec:
         key: quiz/rabbitmq
         property: password
 ---
+# The address the services use: rabbitmq:5672 (and the management UI on 15672).
 apiVersion: v1
 kind: Service
 metadata:
@@ -84,6 +88,8 @@ spec:
     - name: amqp
       port: 5672
 ---
+# A StatefulSet, not a Deployment: one pod with a fixed name (rabbitmq-0) and its own
+# disk, so queued messages survive a restart.
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -136,13 +142,13 @@ spec:
               mountPath: /var/lib/rabbitmq
       containers:
         - name: rabbitmq
-          image: rabbitmq:4.1-management
+          image: rabbitmq:4.1-management   # official image, with the management UI
           ports:
             - name: amqp
               containerPort: 5672
             - name: management
               containerPort: 15672
-          env:
+          env:                    # the user RabbitMQ creates on first start
             - name: RABBITMQ_DEFAULT_USER
               valueFrom:
                 secretKeyRef:
@@ -153,13 +159,13 @@ spec:
                 secretKeyRef:
                   name: rabbitmq-auth
                   key: password
-          readinessProbe:
+          readinessProbe:         # ready when RabbitMQ itself answers
             exec:
               command: ["rabbitmq-diagnostics", "-q", "ping"]
             initialDelaySeconds: 20
             periodSeconds: 30
             timeoutSeconds: 10
-          livenessProbe:
+          livenessProbe:          # restart if the AMQP port stops accepting connections
             tcpSocket:
               port: amqp
             initialDelaySeconds: 60
@@ -186,6 +192,7 @@ spec:
         - name: config
           configMap:
             name: rabbitmq-config
+  # The disk: a 2 GiB volume for rabbitmq-0, kept when the pod is replaced.
   volumeClaimTemplates:
     - metadata:
         name: data

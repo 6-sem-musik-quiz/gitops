@@ -1,5 +1,7 @@
+# Our own Helm chart. Every one of our services is deployed with it (the five APIs,
+# the edge and the frontend); the HelmRelease in apps/<service>.yaml sets what differs.
 apiVersion: v2
 name: quiz-service
 description: One chart for every service of the music quiz (the 5 APIs, the edge service and the frontend)
 type: application
-version: 0.1.0
+version: 0.1.0   # not bumped: the HelmReleases use reconcileStrategy Revision, so any change in Git is picked up

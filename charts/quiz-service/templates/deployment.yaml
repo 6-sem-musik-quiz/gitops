@@ -1,3 +1,5 @@
+# Runs the service's pods. The number of pods is set by the HPA (hpa.yaml), so
+# "replicas" is left out here: otherwise every Flux reconcile would reset it.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -5,20 +7,16 @@ metadata:
   labels:
     {{- include "quiz-service.labels" . | nindent 4 }}
 spec:
-  {{- /* With autoscaling the HPA owns the pod count. Leaving replicas out keeps
-         Flux/Helm from resetting it to replicaCount on every reconcile. */}}
-  {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
-  {{- end }}
   selector:
     matchLabels:
       {{- include "quiz-service.selector" . | nindent 6 }}
-  template:
+  template:                    # the pod
     metadata:
       labels:
         {{- include "quiz-service.labels" . | nindent 8 }}
     spec:
-      automountServiceAccountToken: false
+      automountServiceAccountToken: false   # our apps never call the Kubernetes API
+      # Run as a normal user, never as root, with the default system call filter.
       securityContext:
         runAsNonRoot: true
         runAsUser: {{ .Values.runAsUser }}
@@ -27,15 +25,17 @@ spec:
           type: RuntimeDefault
       containers:
         - name: {{ .Release.Name }}
+          # "required" stops the deploy with this message if a HelmRelease forgets the value.
           image: "{{ required "image.repository is required" .Values.image.repository }}:{{ required "image.tag is required" .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
               containerPort: {{ .Values.port }}
           env:
+            # The port ASP.NET Core listens on.
             - name: ASPNETCORE_HTTP_PORTS
               value: {{ .Values.port | quote }}
             {{- if .Values.otel.enabled }}
+            # Where OpenTelemetry sends traces, metrics and logs, and the name they get in Grafana.
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: {{ .Values.otel.endpoint | quote }}
             - name: OTEL_SERVICE_NAME
@@ -43,10 +43,12 @@ spec:
             - name: OTEL_RESOURCE_ATTRIBUTES
               value: "deployment.environment.name=prod,service.namespace=music-quiz"
             {{- end }}
+            # The service's own variables from values.env.
             {{- range $name, $value := .Values.env }}
             - name: {{ $name }}
               value: {{ $value | quote }}
             {{- end }}
+          # Every key in these Secrets becomes an environment variable (connection strings, keys).
           {{- with .Values.envFromSecrets }}
           envFrom:
             {{- range . }}
@@ -54,27 +56,32 @@ spec:
                 name: {{ . }}
             {{- end }}
           {{- end }}
+          # Readiness: the pod gets traffic only while this answers 200.
           readinessProbe:
             httpGet:
               path: {{ .Values.probes.readinessPath | default .Values.probes.path }}
               port: http
             periodSeconds: 10
+          # Liveness: Kubernetes restarts the container if this stops answering.
           livenessProbe:
             httpGet:
               path: {{ .Values.probes.path }}
               port: http
-            initialDelaySeconds: 15
+            initialDelaySeconds: 15   # give the app time to start first
             periodSeconds: 20
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          # The container cannot gain more rights, has no Linux capabilities and
+          # cannot write to its own files.
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
+          # The one writable folder (.NET and nginx need a temp folder).
           volumeMounts:
             - name: tmp
               mountPath: /tmp
       volumes:
         - name: tmp
-          emptyDir: {}
+          emptyDir: {}         # empty folder that lives as long as the pod
