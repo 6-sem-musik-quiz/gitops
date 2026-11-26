@@ -1,10 +1,17 @@
 apiVersion: apps/v1
-kind: Deployment
+{{- /* statefulSet.enabled: pods with fixed names <name>-0..N-1 behind <name>-headless, so each pod
+       can be addressed on its own (GameService shards, ADR-0004). */}}
+kind: {{ if .Values.statefulSet.enabled }}StatefulSet{{ else }}Deployment{{ end }}
 metadata:
   name: {{ .Release.Name }}
   labels:
     {{- include "quiz-service.labels" . | nindent 4 }}
 spec:
+  {{- if .Values.statefulSet.enabled }}
+  serviceName: {{ .Release.Name }}-headless
+  # Start and stop the shards together, not one after the other.
+  podManagementPolicy: Parallel
+  {{- end }}
   {{- /* With autoscaling the HPA owns the pod count. Leaving replicas out keeps
          Flux/Helm from resetting it to replicaCount on every reconcile. */}}
   {{- if not .Values.autoscaling.enabled }}
