@@ -141,6 +141,13 @@ SignalR connections, so it uses Redis as SignalR backplane and a WebSockets-only
 hub without negotiate (SCRUM-128, see the LobbyService README). Not for
 `gameservice` (keeps game state in memory).
 
+**GameService scales on the Z-axis instead** ([ADR-0004](https://github.com/6-sem-musik-quiz/Platform/blob/main/docs/decisions/0004-gameservice-sharding.md)):
+a StatefulSet (`statefulSet.enabled`) with a fixed number of pods, `gameservice-0..N-1`, behind
+`gameservice-headless`. Every game is owned by the pod `FNV-1a-32(gameId) % N`, and the edge routes
+`?gameId=` there. N is set in three places that must agree: `replicaCount` and `Sharding__ShardCount`
+in `apps/gameservice.yaml`, and `GameSharding__ShardCount` in `apps/edgeservice.yaml`. Change N only
+when no games are running (`slopster_games_active` = 0): `% N` moves almost every game to another pod.
+
 Values in `charts/quiz-service` (set per service in `apps/<service>.yaml`):
 
 | Value | Default | Meaning |

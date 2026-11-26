@@ -57,6 +57,13 @@ spec:
       # GET /api/playlists/{id}/songs/random. Without it the app falls back to its local-dev
       # default (localhost:5002) and every game start fails with 502.
       Services__MusicService: http://musicservice.quiz.svc.cluster.local:8080/
-    # One pod on purpose: games are kept in memory (see README, Autoscaling).
+      # ADR-0004: one shard per pod. Must equal replicaCount below and GameSharding__ShardCount in
+      # apps/edgeservice.yaml. Change all three only when no games are running (% N moves games).
+      # Each pod takes its shard from its name (gameservice-k = shard k).
+      Sharding__ShardCount: "2"
+    # Games are kept in memory, so no HPA: every game is owned by one pod (StatefulSet, ADR-0004).
+    statefulSet:
+      enabled: true
+    replicaCount: 2
     envFromSecrets:
       - gameservice-secrets

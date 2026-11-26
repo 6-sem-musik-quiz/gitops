@@ -21,5 +21,9 @@ spec:
     image:
       repository: ghcr.io/6-sem-musik-quiz/edgeservice
       tag: 15-1adfb5a4-1795690430 # {"$imagepolicy": "quiz:edgeservice:tag"}
+    env:
+      # ADR-0004: send each game's traffic to the GameService pod that owns it,
+      # gameservice-k.gameservice-headless. Must equal Sharding__ShardCount in apps/gameservice.yaml.
+      GameSharding__ShardCount: "2"
     autoscaling:
       enabled: true # min 2: the single entry point keeps one pod up during a rollout
