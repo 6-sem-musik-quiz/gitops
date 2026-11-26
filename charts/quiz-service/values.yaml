@@ -7,8 +7,8 @@ image:
 
 replicaCount: 1         # ignored when autoscaling.enabled is true
 
-# HorizontalPodAutoscaler (autoscaling/v2) on CPU. Only for stateless services:
-# lobbyservice (SignalR) and gameservice (state in memory) keep it off.
+# HorizontalPodAutoscaler (autoscaling/v2) on CPU. Only for stateless services; lobbyservice and
+# gameservice keep their state in Redis and use the SignalR Redis backplane, so they qualify.
 # The percentage is of resources.requests.cpu, so a service needs a cpu request.
 autoscaling:
   enabled: false
@@ -16,12 +16,6 @@ autoscaling:
   maxReplicas: 5
   targetCPUUtilizationPercentage: 70
   scaleDownStabilizationSeconds: 120
-
-# StatefulSet instead of Deployment, plus a headless Service <name>-headless, so each pod has a
-# fixed name and address (<name>-0..N-1). For gameservice: one shard per pod (ADR-0004).
-# replicaCount is then the number of shards; autoscaling must stay off.
-statefulSet:
-  enabled: false
 
 # The container listens on this port. The Service uses the same port,
 # so other pods call http://<name>:8080.
