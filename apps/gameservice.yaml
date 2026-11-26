@@ -51,7 +51,7 @@ spec:
   values:
     image:
       repository: ghcr.io/6-sem-musik-quiz/gameservice
-      tag: 35-69ac9b61-1795688710 # {"$imagepolicy": "quiz:gameservice:tag"}
+      tag: 38-7418c972-1795690418 # {"$imagepolicy": "quiz:gameservice:tag"}
     env:
       # Called inside the cluster (not through the edge) for the songs of a new game:
       # GET /api/playlists/{id}/songs/random. Without it the app falls back to its local-dev
