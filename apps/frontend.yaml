@@ -10,22 +10,22 @@ kind: HelmRelease
 metadata:
   name: frontend
 spec:
-  interval: 10m                     # how often Flux checks that the release matches Git
+  interval: 10m # how often Flux checks that the release matches Git
   chart:
     spec:
-      chart: ./charts/quiz-service    # our own chart, from this repo
-      reconcileStrategy: Revision     # a chart change in Git is picked up without a version bump
+      chart: ./charts/quiz-service # our own chart, from this repo
+      reconcileStrategy: Revision # a chart change in Git is picked up without a version bump
       sourceRef:
-        kind: GitRepository           # this repo, as Flux knows it
+        kind: GitRepository # this repo, as Flux knows it
         name: quiz
-  values:                           # overrides charts/quiz-service/values.yaml
+  values: # overrides charts/quiz-service/values.yaml
     image:
       repository: ghcr.io/6-sem-musik-quiz/frontend
-      tag: 87-5ff0ee90-1795728483 # {"$imagepolicy": "quiz:frontend:tag"}
-    runAsUser: 101                    # the nginx user in nginx-unprivileged
+      tag: 89-ac4552de-1795733768 # {"$imagepolicy": "quiz:frontend:tag"}
+    runAsUser: 101 # the nginx user in nginx-unprivileged
     otel:
       enabled: false # static files: nothing to trace on the server
-    resources:                        # smaller than the chart default: nginx serving files
+    resources: # smaller than the chart default: nginx serving files
       requests:
         cpu: 20m
         memory: 32Mi
