@@ -136,17 +136,15 @@ each (X-axis). Reads mostly never reach Garage: the CDN serves them.
 The stateless services scale out by themselves (X-axis): a
 `HorizontalPodAutoscaler` adds pods when their CPU is high and removes them
 when it is low. Turned on for `frontend`, `edgeservice`, `userservice`,
-`musicservice`, `statisticservice` and `lobbyservice`. `lobbyservice` holds
+`musicservice`, `statisticservice`, `lobbyservice` and `gameservice`. `lobbyservice` holds
 SignalR connections, so it uses Redis as SignalR backplane and a WebSockets-only
-hub without negotiate (SCRUM-128, see the LobbyService README). Not for
-`gameservice` (keeps game state in memory).
+hub without negotiate (SCRUM-128, see the LobbyService README). `gameservice`
+does the same and keeps its games in Redis (ADR-0004), so it has an HPA too.
 
-**GameService scales on the Z-axis instead** ([ADR-0004](https://github.com/6-sem-musik-quiz/Platform/blob/main/docs/decisions/0004-gameservice-sharding.md)):
-a StatefulSet (`statefulSet.enabled`) with a fixed number of pods, `gameservice-0..N-1`, behind
-`gameservice-headless`. Every game is owned by the pod `FNV-1a-32(gameId) % N`, and the edge routes
-`?gameId=` there. N is set in three places that must agree: `replicaCount` and `Sharding__ShardCount`
-in `apps/gameservice.yaml`, and `GameSharding__ShardCount` in `apps/edgeservice.yaml`. Change N only
-when no games are running (`slopster_games_active` = 0): `% N` moves almost every game to another pod.
+**GameService** keeps its running games in Redis ([ADR-0004](https://github.com/6-sem-musik-quiz/Platform/blob/main/docs/decisions/0004-gameservice-scaling.md)):
+the game, a lock per game and the game's timers (as deadlines all pods poll), plus the SignalR Redis
+backplane. So it is stateless like the others and has an HPA; a pod can die or roll out without ending
+games (players reconnect to another pod). `ConnectionStrings__Redis` comes from `gameservice-secrets`.
 
 Values in `charts/quiz-service` (set per service in `apps/<service>.yaml`):
 

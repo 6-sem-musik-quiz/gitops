@@ -11,23 +11,3 @@ spec:
     - name: http
       port: {{ .Values.port }}
       targetPort: http
-{{- if .Values.statefulSet.enabled }}
----
-# Headless: DNS gives every pod its own name, <name>-<k>.<name>-headless (StatefulSet).
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ .Release.Name }}-headless
-  labels:
-    {{- include "quiz-service.labels" . | nindent 4 }}
-spec:
-  clusterIP: None
-  # A shard keeps its DNS name while it (re)starts; the edge then gets a refused connection, not a DNS error.
-  publishNotReadyAddresses: true
-  selector:
-    {{- include "quiz-service.selector" . | nindent 4 }}
-  ports:
-    - name: http
-      port: {{ .Values.port }}
-      targetPort: http
-{{- end }}
