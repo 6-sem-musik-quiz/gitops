@@ -4,29 +4,28 @@
 # Cloudflare Tunnel sends https://quiz.munkcloud.dk/* (everything except /api)
 # here. The app runs in the browser and calls /api/<service>/ on the same
 # hostname, which the tunnel sends to edgeservice, so no CORS.
+# Autoscaled by the chart's HPA (2-5 pods on CPU).
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: frontend
 spec:
-  interval: 10m
+  interval: 10m                     # how often Flux checks that the release matches Git
   chart:
     spec:
-      chart: ./charts/quiz-service
-      reconcileStrategy: Revision
+      chart: ./charts/quiz-service    # our own chart, from this repo
+      reconcileStrategy: Revision     # a chart change in Git is picked up without a version bump
       sourceRef:
-        kind: GitRepository
+        kind: GitRepository           # this repo, as Flux knows it
         name: quiz
-  values:
+  values:                           # overrides charts/quiz-service/values.yaml
     image:
       repository: ghcr.io/6-sem-musik-quiz/frontend
       tag: 87-5ff0ee90-1795728483 # {"$imagepolicy": "quiz:frontend:tag"}
-    runAsUser: 101
-    autoscaling:
-      enabled: true # stateless: HPA on CPU (chart defaults: 2-5 pods, 70 %)
+    runAsUser: 101                    # the nginx user in nginx-unprivileged
     otel:
       enabled: false # static files: nothing to trace on the server
-    resources:
+    resources:                        # smaller than the chart default: nginx serving files
       requests:
         cpu: 20m
         memory: 32Mi

@@ -1,8 +1,9 @@
+# Everything our services depend on, all running inside the namespace quiz.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - bitnami.yaml
-  - postgresql.yaml
-  - redis.yaml
-  - rabbitmq.yaml
-  - garage.yaml
+  - bitnami.yaml      # where the Postgres and Redis Helm charts come from
+  - postgresql.yaml   # one Postgres server, one database per service
+  - redis.yaml        # lobbies, running games and the SignalR backplane
+  - rabbitmq.yaml     # the GameFinished messages
+  - garage.yaml       # the song files (S3-compatible storage behind Cloudflare CDN)

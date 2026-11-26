@@ -1,3 +1,5 @@
+# A stable name and address for the pods: other pods call http://<release name>:<port>
+# and Kubernetes spreads the calls over the pods that have the selector's label.
 apiVersion: v1
 kind: Service
 metadata:
@@ -10,4 +12,4 @@ spec:
   ports:
     - name: http
       port: {{ .Values.port }}
-      targetPort: http
+      targetPort: http   # the container port named "http" in deployment.yaml

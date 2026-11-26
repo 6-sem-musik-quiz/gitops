@@ -1,49 +1,52 @@
-# Default values. Each HelmRelease in apps/ overrides what differs per service.
+# Default values for the chart. Each HelmRelease in apps/ overrides only what
+# differs for that service.
 
 image:
-  repository: ""        # e.g. ghcr.io/6-sem-musik-quiz/userservice
-  tag: ""               # set by Flux image automation
-  pullPolicy: IfNotPresent
+  repository: ""        # e.g. ghcr.io/6-sem-musik-quiz/userservice (required)
+  tag: ""               # written by Flux image automation (required)
 
-replicaCount: 1         # ignored when autoscaling.enabled is true
-
-# HorizontalPodAutoscaler (autoscaling/v2) on CPU. Only for stateless services; lobbyservice and
-# gameservice keep their state in Redis and use the SignalR Redis backplane, so they qualify.
-# The percentage is of resources.requests.cpu, so a service needs a cpu request.
+# Horizontal Pod Autoscaler (HPA) on CPU. Every service gets one: they are all
+# stateless (LobbyService and GameService keep their state in Redis), so any pod
+# can answer any request and Kubernetes can add or remove pods freely.
+# The percentage is of resources.requests.cpu below.
 autoscaling:
-  enabled: false
-  minReplicas: 2
+  minReplicas: 2                       # 2, so one pod can die or be replaced without downtime
   maxReplicas: 5
-  targetCPUUtilizationPercentage: 70
-  scaleDownStabilizationSeconds: 120
+  targetCPUUtilizationPercentage: 70   # add pods when the average is above 70 % of the request
+  scaleDownStabilizationSeconds: 120   # low load this long before pods are removed (Kubernetes' default is 300)
 
 # The container listens on this port. The Service uses the same port,
 # so other pods call http://<name>:8080.
 port: 8080
 
+# Health checks Kubernetes makes on every pod.
 probes:
-  path: /health        # liveness
-  readinessPath: ""  # empty = same as path; backends use /health/ready (checks Postgres)
+  path: /health         # liveness: is the process alive? If not, Kubernetes restarts it
+  readinessPath: ""     # readiness: may it get traffic? Empty = same as path.
+                        # LobbyService and GameService use /health/ready, which also checks Redis.
 
-# Plain environment variables: NAME: value
+# Plain environment variables, NAME: value.
 env: {}
 
-# Secrets whose keys become environment variables (made by ExternalSecrets).
+# Kubernetes Secrets whose keys all become environment variables.
+# They are made by the ExternalSecrets in apps/ from OpenBao.
 envFromSecrets: []
 
-# OpenTelemetry: the homelab's Grafana Alloy gateway. The app needs the
-# OpenTelemetry .NET SDK with UseOtlpExporter() before anything arrives.
+# OpenTelemetry: traces, metrics and logs go to the homelab's Grafana Alloy
+# gateway. The app sends them itself (the OpenTelemetry .NET SDK, UseOtlpExporter()).
 otel:
   enabled: true
   endpoint: http://alloy.monitoring.svc.cluster.local:4317
 
+# CPU and memory per pod. The request is what the pod is guaranteed (and what the
+# HPA's percentage is of); the memory limit is where Kubernetes kills the pod.
 resources:
   requests:
-    cpu: 50m
+    cpu: 50m            # 5 % of one CPU core
     memory: 96Mi
   limits:
     memory: 256Mi
 
-# 1654 is the "app" user in the Microsoft .NET images.
+# The user id the container runs as. 1654 is the "app" user in Microsoft's .NET images.
 # The frontend (nginx-unprivileged) overrides it with 101.
 runAsUser: 1654

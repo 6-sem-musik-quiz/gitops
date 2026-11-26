@@ -4,7 +4,13 @@
 #
 # Tag format from CI: <run number>-<8 char sha>-<unix time>, e.g. 12-a1b2c3d4-1791234567.
 # The newest unix time wins (the run number restarts if the workflow file is renamed).
+#
+# Every service has the same pair: an ImageRepository (which image to watch) and an
+# ImagePolicy (which of its tags is the newest). The first pair is commented; the
+# others only differ in the name. At the bottom, ImageUpdateAutomation writes the
+# chosen tags into Git.
 ---
+# Lists the image's tags in GHCR every 5 minutes.
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
 metadata:
@@ -13,6 +19,9 @@ spec:
   image: ghcr.io/6-sem-musik-quiz/edgeservice
   interval: 5m
 ---
+# Picks the newest tag: only tags that match the CI format count, the unix time
+# at the end is taken out ("ts"), and the biggest number wins.
+# The HelmRelease's {"$imagepolicy": "quiz:edgeservice:tag"} marker points here.
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImagePolicy
 metadata:
@@ -159,6 +168,8 @@ spec:
     numerical:
       order: asc
 ---
+# Every 5 minutes: check out main, put the newest tags into the files under ./apps
+# (at the {"$imagepolicy": ...} markers, "Setters"), commit as fluxcdbot and push to main.
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageUpdateAutomation
 metadata:

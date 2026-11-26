@@ -1,7 +1,6 @@
-{{- if .Values.autoscaling.enabled }}
 # X-axis scaling: Kubernetes starts more pods of this stateless service when
-# the average CPU use (of the request) goes above the target, and removes them
-# again when it falls. Needs metrics-server (k3s has it).
+# the average CPU use (in % of the request) goes above the target, and removes
+# them again when it falls. Needs metrics-server (k3s has it).
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -9,7 +8,7 @@ metadata:
   labels:
     {{- include "quiz-service.labels" . | nindent 4 }}
 spec:
-  scaleTargetRef:
+  scaleTargetRef:          # the Deployment it scales
     apiVersion: apps/v1
     kind: Deployment
     name: {{ .Release.Name }}
@@ -27,4 +26,3 @@ spec:
       # Wait 2 minutes of low load before removing pods (default is 5), so a
       # load test shows both directions within a few minutes.
       stabilizationWindowSeconds: {{ .Values.autoscaling.scaleDownStabilizationSeconds }}
-{{- end }}

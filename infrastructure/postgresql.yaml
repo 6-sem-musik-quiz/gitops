@@ -58,7 +58,7 @@ spec:
   chart:
     spec:
       chart: postgresql
-      version: "18.12.20"
+      version: "18.12.20"             # pinned: a new chart version is a deliberate change
       sourceRef:
         kind: HelmRepository
         name: bitnami
@@ -74,16 +74,16 @@ spec:
       repository: 6-sem-musik-quiz/postgresql
       tag: "18.7-vector-portable"
       digest: "sha256:3d305874bd1cabd9db95fd78ae75323ec6891ca63709cc4541951cad24c2f289"
-    auth:
+    auth:                              # the admin password from the first ExternalSecret
       existingSecret: postgresql-auth
       secretKeys:
         adminPasswordKey: postgres-password
     primary:
       initdb:
-        scriptsSecret: postgresql-initdb
+        scriptsSecret: postgresql-initdb   # the first-boot SQL from the second ExternalSecret
       persistence:
-        size: 5Gi
-      resourcesPreset: none
+        size: 5Gi                      # the disk with all three databases
+      resourcesPreset: none            # use our own requests and limits below
       resources:
         requests:
           cpu: 100m
@@ -106,9 +106,9 @@ metadata:
     tailscale.com/tags: tag:quiz-postgres
 spec:
   type: LoadBalancer
-  loadBalancerClass: tailscale
+  loadBalancerClass: tailscale         # the Tailscale operator makes the tailnet address
   allocateLoadBalancerNodePorts: false # node ports are not allowed in quiz
-  selector:
+  selector:                            # the Postgres pod made by the chart
     app.kubernetes.io/component: primary
     app.kubernetes.io/instance: postgresql
     app.kubernetes.io/name: postgresql
