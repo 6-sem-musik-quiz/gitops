@@ -20,6 +20,6 @@ spec:
   values:
     image:
       repository: ghcr.io/6-sem-musik-quiz/edgeservice
-      tag: 13-74bce099-1795553886 # {"$imagepolicy": "quiz:edgeservice:tag"}
+      tag: 15-1adfb5a4-1795690430 # {"$imagepolicy": "quiz:edgeservice:tag"}
     autoscaling:
       enabled: true # min 2: the single entry point keeps one pod up during a rollout
