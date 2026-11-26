@@ -12,7 +12,7 @@ infrastructure/
   bitnami.yaml              the Bitnami chart repo (as in class)
   postgresql.yaml           1 Postgres, 1 database + 1 user per service
   redis.yaml                cache for LobbyService
-  rabbitmq.yaml             queue GameService -> StatisticService (plain YAML)
+  rabbitmq.yaml             GameFinished from GameService -> StatisticService and LobbyService (plain YAML)
   garage.yaml               BlobStorage for the song files, behind Cloudflare CDN (Garage's chart from git)
 apps/
   <service>.yaml            ExternalSecret (connection strings) + HelmRelease
