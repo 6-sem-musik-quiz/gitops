@@ -107,8 +107,33 @@ spec:
         runAsUser: 999      # the "rabbitmq" user in the official image
         runAsGroup: 999
         fsGroup: 999
+        # Only re-own the volume when its root does not match, not on every start.
+        fsGroupChangePolicy: OnRootMismatch
         seccompProfile:
           type: RuntimeDefault
+      # Erlang refuses to start ("Cookie file ... must be accessible by owner only")
+      # if .erlang.cookie on the data volume has group/other bits, which fsGroup can add.
+      # Runs after the kubelet has set volume permissions, so it also repairs a broken file.
+      initContainers:
+        - name: fix-cookie-perms
+          image: rabbitmq:4.1-management
+          command:
+            - sh
+            - -c
+            - "if [ -f /var/lib/rabbitmq/.erlang.cookie ]; then chmod 400 /var/lib/rabbitmq/.erlang.cookie; fi"
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 32Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/rabbitmq
       containers:
         - name: rabbitmq
           image: rabbitmq:4.1-management
