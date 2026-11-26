@@ -10,15 +10,15 @@ kind: HelmRelease
 metadata:
   name: edgeservice
 spec:
-  interval: 10m                     # how often Flux checks that the release matches Git
+  interval: 10m # how often Flux checks that the release matches Git
   chart:
     spec:
-      chart: ./charts/quiz-service    # our own chart, from this repo
-      reconcileStrategy: Revision     # a chart change in Git is picked up without a version bump
+      chart: ./charts/quiz-service # our own chart, from this repo
+      reconcileStrategy: Revision # a chart change in Git is picked up without a version bump
       sourceRef:
-        kind: GitRepository           # this repo, as Flux knows it
+        kind: GitRepository # this repo, as Flux knows it
         name: quiz
-  values:                           # overrides charts/quiz-service/values.yaml
+  values: # overrides charts/quiz-service/values.yaml
     image:
       repository: ghcr.io/6-sem-musik-quiz/edgeservice
-      tag: 20-309e97e3-1795708919 # {"$imagepolicy": "quiz:edgeservice:tag"}
+      tag: 22-a7093e71-1795733741 # {"$imagepolicy": "quiz:edgeservice:tag"}
