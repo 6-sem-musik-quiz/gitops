@@ -26,6 +26,10 @@ spec:
         {{- include "quiz-service.labels" . | nindent 8 }}
     spec:
       automountServiceAccountToken: false
+      {{- with .Values.terminationGracePeriodSeconds }}
+      # How long Kubernetes waits for preStop and shutdown before it kills the pod.
+      terminationGracePeriodSeconds: {{ . }}
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: {{ .Values.runAsUser }}
@@ -60,6 +64,14 @@ spec:
             - secretRef:
                 name: {{ . }}
             {{- end }}
+          {{- end }}
+          {{- with .Values.preStopHttpPath }}
+          # Called before the pod is stopped (scale-down, deploy); the pod stops when it returns.
+          lifecycle:
+            preStop:
+              httpGet:
+                path: {{ . }}
+                port: http
           {{- end }}
           readinessProbe:
             httpGet:

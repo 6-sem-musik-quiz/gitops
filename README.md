@@ -141,12 +141,13 @@ SignalR connections, so it uses Redis as SignalR backplane and a WebSockets-only
 hub without negotiate (SCRUM-128, see the LobbyService README). Not for
 `gameservice` (keeps game state in memory).
 
-**GameService scales on the Z-axis instead** ([ADR-0004](https://github.com/6-sem-musik-quiz/Platform/blob/main/docs/decisions/0004-gameservice-sharding.md)):
-a StatefulSet (`statefulSet.enabled`) with a fixed number of pods, `gameservice-0..N-1`, behind
-`gameservice-headless`. Every game is owned by the pod `FNV-1a-32(gameId) % N`, and the edge routes
-`?gameId=` there. N is set in three places that must agree: `replicaCount` and `Sharding__ShardCount`
-in `apps/gameservice.yaml`, and `GameSharding__ShardCount` in `apps/edgeservice.yaml`. Change N only
-when no games are running (`slopster_games_active` = 0): `% N` moves almost every game to another pod.
+**GameService scales on the Z-axis** ([ADR-0004](https://github.com/6-sem-musik-quiz/Platform/blob/main/docs/decisions/0004-gameservice-sharding.md)):
+a StatefulSet (`statefulSet.enabled`), `gameservice-0..N-1` behind `gameservice-headless`, with an HPA
+(2-4 pods). Every game lives in the pod that created it; the first two hex characters of the gameId are
+that pod's number, and the edge routes `?gameId=` there (`GameSharding__Enabled`). New pods simply get new
+games. Before a pod stops (scale-down or deploy), `preStop` calls `/internal/drain`: the pod becomes not
+ready, takes no new games, and stops only when its games are over (`terminationGracePeriodSeconds: 1800`).
+So a GameService rollout can take up to one game's length per pod.
 
 Values in `charts/quiz-service` (set per service in `apps/<service>.yaml`):
 

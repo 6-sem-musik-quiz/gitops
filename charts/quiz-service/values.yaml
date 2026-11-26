@@ -23,6 +23,13 @@ autoscaling:
 statefulSet:
   enabled: false
 
+# Optional: GET this path before the pod is stopped (Kubernetes preStop). The pod is only
+# stopped when it returns, or when terminationGracePeriodSeconds runs out. gameservice uses
+# /internal/drain to finish its games first (ADR-0004).
+preStopHttpPath: ""
+# Empty = Kubernetes' default (30 s).
+terminationGracePeriodSeconds: ""
+
 # The container listens on this port. The Service uses the same port,
 # so other pods call http://<name>:8080.
 port: 8080

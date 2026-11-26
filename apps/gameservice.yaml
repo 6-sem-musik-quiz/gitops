@@ -57,13 +57,21 @@ spec:
       # GET /api/playlists/{id}/songs/random. Without it the app falls back to its local-dev
       # default (localhost:5002) and every game start fails with 502.
       Services__MusicService: http://musicservice.quiz.svc.cluster.local:8080/
-      # ADR-0004: one shard per pod. Must equal replicaCount below and GameSharding__ShardCount in
-      # apps/edgeservice.yaml. Change all three only when no games are running (% N moves games).
-      # Each pod takes its shard from its name (gameservice-k = shard k).
-      Sharding__ShardCount: "2"
-    # Games are kept in memory, so no HPA: every game is owned by one pod (StatefulSet, ADR-0004).
+    # ADR-0004: games are kept in memory, and each game lives in the pod that created it. The pod's
+    # number (from its name, gameservice-k) is the first two hex characters of the gameId, and the edge
+    # routes by it, so pods can be added and removed without moving a game.
     statefulSet:
       enabled: true
-    replicaCount: 2
+    autoscaling:
+      enabled: true
+      minReplicas: 2 # one pod can drain or roll out while the other takes new games
+      maxReplicas: 4 # must not exceed GameSharding__MaxShards in apps/edgeservice.yaml (16)
+    probes:
+      path: /health
+      readinessPath: /health/ready # fails while the pod drains, so new games go to the other pods
+    # Before a pod stops (scale-down or deploy) it takes no new games and waits until its games are
+    # over. The longest game is 20 rounds of up to ~75 s (about 25 min), so allow 30 min.
+    preStopHttpPath: /internal/drain
+    terminationGracePeriodSeconds: 1800
     envFromSecrets:
       - gameservice-secrets
