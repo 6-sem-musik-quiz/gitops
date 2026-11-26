@@ -57,3 +57,9 @@ spec:
       Services__GameService: http://gameservice.quiz.svc.cluster.local:8080/
     envFromSecrets:
       - lobbyservice-secrets
+    # Kept away from the image tag above, which Flux rewrites ("Update images"), so the two never conflict.
+    autoscaling:
+      # HPA on CPU (chart defaults: 2-5 pods, 70 %). Possible since SCRUM-128: SignalR uses Redis as
+      # backplane, so a lobby update reaches players on every pod, and the hub is WebSockets-only
+      # without negotiate, so a connection never spans two pods.
+      enabled: true
