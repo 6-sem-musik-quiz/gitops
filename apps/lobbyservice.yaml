@@ -47,6 +47,11 @@ spec:
     image:
       repository: ghcr.io/6-sem-musik-quiz/lobbyservice
       tag: 37-3d85d3a1-1795611975 # {"$imagepolicy": "quiz:lobbyservice:tag"}
+    autoscaling:
+      # HPA on CPU (chart defaults: 2-5 pods, 70 %). Possible since SCRUM-128: SignalR uses Redis as
+      # backplane, so a lobby update reaches players on every pod, and the hub is WebSockets-only
+      # without negotiate, so a connection never spans two pods.
+      enabled: true
     probes:
       readinessPath: /health/ready # ready only when Redis answers
     env:

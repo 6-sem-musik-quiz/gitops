@@ -136,8 +136,10 @@ each (X-axis). Reads mostly never reach Garage: the CDN serves them.
 The stateless services scale out by themselves (X-axis): a
 `HorizontalPodAutoscaler` adds pods when their CPU is high and removes them
 when it is low. Turned on for `frontend`, `edgeservice`, `userservice`,
-`musicservice` and `statisticservice`. Not for `lobbyservice` (SignalR needs a
-Redis backplane first, SCRUM-128) or `gameservice` (keeps game state in memory).
+`musicservice`, `statisticservice` and `lobbyservice`. `lobbyservice` holds
+SignalR connections, so it uses Redis as SignalR backplane and a WebSockets-only
+hub without negotiate (SCRUM-128, see the LobbyService README). Not for
+`gameservice` (keeps game state in memory).
 
 Values in `charts/quiz-service` (set per service in `apps/<service>.yaml`):
 
