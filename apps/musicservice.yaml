@@ -9,8 +9,8 @@ kind: ExternalSecret
 metadata:
   name: musicservice-secrets
 spec:
-  refreshInterval: 1h               # read OpenBao again every hour
-  secretStoreRef:                   # where the values come from: OpenBao
+  refreshInterval: 1h # read OpenBao again every hour
+  secretStoreRef: # where the values come from: OpenBao
     kind: SecretStore
     name: openbao
   target:
@@ -48,24 +48,24 @@ kind: HelmRelease
 metadata:
   name: musicservice
 spec:
-  interval: 10m                     # how often Flux checks that the release matches Git
-  dependsOn:                        # deploy only after postgresql is ready
+  interval: 10m # how often Flux checks that the release matches Git
+  dependsOn: # deploy only after postgresql is ready
     - name: postgresql
   chart:
     spec:
-      chart: ./charts/quiz-service    # our own chart, from this repo
-      reconcileStrategy: Revision     # a chart change in Git is picked up without a version bump
+      chart: ./charts/quiz-service # our own chart, from this repo
+      reconcileStrategy: Revision # a chart change in Git is picked up without a version bump
       sourceRef:
-        kind: GitRepository           # this repo, as Flux knows it
+        kind: GitRepository # this repo, as Flux knows it
         name: quiz
-  values:                           # overrides charts/quiz-service/values.yaml
+  values: # overrides charts/quiz-service/values.yaml
     image:
       repository: ghcr.io/6-sem-musik-quiz/musicservice
-      tag: 34-4474ed86-1795708942 # {"$imagepolicy": "quiz:musicservice:tag"}
+      tag: 36-96b0a303-1795733841 # {"$imagepolicy": "quiz:musicservice:tag"}
     env:
       # Garage's S3 API inside the cluster, where uploads go. The bucket is "media" (the default in code).
       BlobStorage__ServiceUrl: http://garage.quiz.svc.cluster.local:3900
       # Where the browser downloads song files from: Cloudflare CDN in front of the bucket.
       BlobStorage__PublicBaseUrl: https://media.munkcloud.dk
-    envFromSecrets:                   # the Secret made by the ExternalSecret above
+    envFromSecrets: # the Secret made by the ExternalSecret above
       - musicservice-secrets
