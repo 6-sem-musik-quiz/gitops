@@ -1,0 +1,9 @@
+{
+  "name": "slopster-loadtest",
+  "private": true,
+  "type": "module",
+  "description": "SCRUM-197: k6 load bots. package.json only lets `node --test` read the ES modules in lib/; k6 does not use it.",
+  "scripts": {
+    "test": "node --test \"lib/*.test.js\""
+  }
+}
