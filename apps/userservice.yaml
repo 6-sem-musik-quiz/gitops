@@ -21,7 +21,7 @@ spec:
     template:
       engineVersion: v2
       data:
-        ConnectionStrings__Default: "Host=postgresql.quiz.svc.cluster.local;Port=5432;Database=userservice;Username=userservice;Password={{ .dbPassword }}"
+        ConnectionStrings__Default: "Host=quizdb-postgresql-primary.quiz.svc.cluster.local;Port=5432;Database=userservice;Username=userservice;Password={{ .dbPassword }}"
         Jwt__SigningKey: "{{ .jwtSigningKey }}"
   # Values fetched from OpenBao: secretKey = the name used in the template above.
   data:
