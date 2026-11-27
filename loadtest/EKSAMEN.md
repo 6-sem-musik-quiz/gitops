@@ -18,7 +18,7 @@ starter selv flere pods (autoscaling), mens svartiden holder sig under 500 ms. B
 | ☐ | Installér k6 | `winget install GrafanaLabs.k6`, og åbn en ny terminal |
 | ☐ | Hent bot-passwordet | OpenBao → `kv/quiz/loadtest` → `bot-password`. Scriptet spørger efter det første gang og husker det i `%USERPROFILE%\.slopster-loadtest` (ikke i git) |
 | ☐ | kubectl virker (valgfrit) | Tailscale kører, og `kubectl get pods` viser pods i `quiz` (se Platform `docs/drift.md`). Uden kubectl bruger du bare Grafana |
-| ☐ | Grafana-login | Dashboardet **"Slopster Autoscaling"** i Quiz-org. Adresse og login: _(Asger udfylder)_ |
+| ☐ | Grafana virker | Tailscale kører, og du kan logge ind på **https://grafana-quiz.tail5a1bc5.ts.net** med den adgang, Asger har givet. Dashboardet: [Quiz Overview](https://grafana-quiz.tail5a1bc5.ts.net/d/quiz-overview/quiz-overview) |
 
 ## 2. Dagen før eksamen (3 min)
 
@@ -38,7 +38,7 @@ Står der `CHECK FAILED`, så se [Hvis noget fejler](#6-hvis-noget-fejler) og sk
 
 ## 3. Til eksamen (3 trin)
 
-1. **Åbn Grafana** på dashboardet "Slopster Autoscaling", så censor kan se det. Alle services står på 2 pods.
+1. **Åbn Grafana** på [Quiz Overview](https://grafana-quiz.tail5a1bc5.ts.net/d/quiz-overview/quiz-overview) (Tailscale skal køre), så censor kan se det. Alle services står på 2 pods.
 2. **Start demoen:**
    ```powershell
    powershell -ExecutionPolicy Bypass -File .\loadtest\stress.ps1

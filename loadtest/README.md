@@ -48,7 +48,7 @@ Hold `-Rate` under ca. 90: alt fra én maskine deler edge'ens grænse på 1000 r
 
 | Hvor | Godt tegn |
 |---|---|
-| **HPA-vinduet** (`kubectl get hpa -w`) eller **Grafana → "Slopster Autoscaling"** | `REPLICAS` går fra 2 mod 5, og ned igen ca. 2 min efter testen |
+| **HPA-vinduet** (`kubectl get hpa -w`) eller **Grafana → [Quiz Overview](https://grafana-quiz.tail5a1bc5.ts.net/d/quiz-overview/quiz-overview)** (kræver Tailscale) | `REPLICAS` går fra 2 mod 5, og ned igen ca. 2 min efter testen |
 | **HTTP-vinduet**, til sidst | `failed 0.00 %`, `429 from the edge: 0`, p95 under 500 ms pr. endpoint, `Thresholds: all held` |
 | **Bots-vinduet**, til sidst | `bot_errors` = 0, `games_completed` > 0, `checks` ≥ 99 % |
 | **`loadtest/results/`** | HTTP-resultatet gemt som `http-<tid>Z.txt` og `.json` (tiden er UTC). Gem den kørsel, I vil vise |

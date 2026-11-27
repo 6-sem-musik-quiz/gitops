@@ -116,6 +116,7 @@ if (Get-Command kubectl -ErrorAction SilentlyContinue) {
 
 Write-Host ''
 Write-Host "Started: $($started -join ' + '), ramp-up $RampUp, plateau $Duration." -ForegroundColor Green
-Write-Host 'Now open Grafana, dashboard "Slopster Autoscaling", and watch the pods go from 2 towards 5.'
+Write-Host 'Now open Grafana (Tailscale on) and watch the pods go from 2 towards 5:'
+Write-Host '  https://grafana-quiz.tail5a1bc5.ts.net/d/quiz-overview/quiz-overview'
 Write-Host 'The HTTP result is saved in loadtest/results/ when its window says "Thresholds".'
 Write-Host 'After the demo the pods scale down again in about 2 minutes.'
