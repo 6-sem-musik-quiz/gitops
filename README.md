@@ -37,8 +37,8 @@ Never edit an image tag by hand; Flux owns the lines with `{"$imagepolicy": ...}
 | edgeservice (YARP) | the internet | `https://quiz.munkcloud.dk/api/<service>/*`, own endpoints at `/api/edge` |
 | userservice, lobbyservice, gameservice, musicservice, statisticservice | inside the cluster only | `http://<name>:8080` |
 | postgresql | inside the cluster only | `postgresql:5432` |
-| quizdb (primary) | inside the cluster only | `quizdb-primary:5432` (read and write) |
-| quizdb (replicas) | inside the cluster only | `quizdb-read:5432` (read only) |
+| quizdb (primary) | inside the cluster only | `quizdb-postgresql-primary:5432` (read and write) |
+| quizdb (replicas) | inside the cluster only | `quizdb-postgresql-read:5432` (read only) |
 | redis | inside the cluster only | `redis-master:6379` |
 | rabbitmq | inside the cluster only | `rabbitmq:5672`, UI on 15672 |
 | garage (S3 API) | inside the cluster only | `http://garage:3900`, region `garage`, path-style |
