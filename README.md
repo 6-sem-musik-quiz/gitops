@@ -106,6 +106,15 @@ player --GET--> media.munkcloud.dk (Cloudflare CDN) --cache miss--> Tunnel --> g
   roughly once per file instead of once per Cloudflare location.
 - Check: `curl -sI https://media.munkcloud.dk/test/cdn-test.txt` shows
   `cf-cache-status: HIT` from the second request on.
+- Cache rule "Slopster frontend" (SCRUM-130): host `quiz.munkcloud.dk` and path starting
+  with `/_framework/` is eligible for cache, edge and browser TTL = respect origin, 4xx/5xx
+  never stored. nginx sends `public, max-age=31536000, immutable` for those files (their names
+  contain a hash), so Cloudflare keeps them, `.wasm` included, which it does not cache by default.
+  `index.html`, `/api/*` and `/hubs/*` are not matched and stay uncached; a deploy needs no purge,
+  because the new `index.html` names new files. A missing file is a 404 with `no-store` from
+  nginx (the rule alone did not stop every Cloudflare location from storing 404s).
+- Check: `curl -sI https://quiz.munkcloud.dk/_framework/<a .wasm file>` shows `cf-cache-status: HIT`
+  from the second request on; `curl -sI https://quiz.munkcloud.dk/` stays `DYNAMIC`.
 
 ### One-time setup (done 2026-11-20; again only on a fresh volume)
 
