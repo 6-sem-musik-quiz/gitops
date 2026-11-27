@@ -1,6 +1,6 @@
 # GameService: runs the games, publishes results to RabbitMQ. No SQL database in the C4 design.
 # ADR-0004: the running games are in Redis (the same as LobbyService's), so GameService is stateless
-# and autoscales like the other services (chart HPA, 2-5 pods); any pod can serve any game.
+# and autoscales like the other services (chart HPA, 2-10 pods); any pod can serve any game.
 #
 # Secrets: the RabbitMQ settings and the Redis connection string, built from the passwords in OpenBao,
 # and the JWT signing key (kv/quiz/jwt, the same key UserService signs its tokens with). Without the
@@ -61,6 +61,8 @@ spec:
         kind: GitRepository # this repo, as Flux knows it
         name: quiz
   values: # overrides charts/quiz-service/values.yaml
+    autoscaling:
+      maxReplicas: 10 # stress test 2026-11-27: hit the chart's 5 while the node used 1.7 of 5 cores
     image:
       repository: ghcr.io/6-sem-musik-quiz/gameservice
       tag: 51-aade6f4c-1795789572 # {"$imagepolicy": "quiz:gameservice:tag"}

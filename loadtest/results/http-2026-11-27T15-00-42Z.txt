@@ -1,0 +1,11 @@
+SCRUM-198 HTTP load against https://quiz.munkcloud.dk
+RATE 60/s, USERS 20, RAMP_UP 1m, DURATION 5m, ramp-down 30s
+
+20739 requests (52.8/s), failed 0.00 %, 429 from the edge: 0
+
+  weekly     avg   26 ms   p95   29 ms   OK
+  my_stats   avg   26 ms   p95   30 ms   OK
+  my_user    avg   26 ms   p95   30 ms   OK
+  playlists  avg   26 ms   p95   30 ms   OK
+
+Thresholds: all held
