@@ -23,6 +23,8 @@ spec:
       engineVersion: v2
       data:
         ConnectionStrings__Default: "Host=quizdb-postgresql-primary.quiz.svc.cluster.local;Port=5432;Database=statisticservice;Username=statisticservice;Password={{ .dbPassword }}"
+        # SCRUM-202: reads ("my stats", leaderboard fallback) go to the read replicas.
+        ConnectionStrings__Read: "Host=quizdb-postgresql-read.quiz.svc.cluster.local;Port=5432;Database=statisticservice;Username=statisticservice;Password={{ .dbPassword }}"
         RabbitMQ__Host: "rabbitmq.quiz.svc.cluster.local"
         RabbitMQ__Username: "{{ .rabbitUser }}"
         RabbitMQ__Password: "{{ .rabbitPassword }}"
