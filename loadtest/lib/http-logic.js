@@ -49,3 +49,28 @@ export function validateOptions({ users, rate, rampUp, duration }) {
   if (total > MAX_TOTAL_MS) return `RAMP_UP + DURATION + ${RAMP_DOWN} must be at most 14 min (access tokens live 15 min)`;
   return null;
 }
+
+// The text summary printed and saved by http.js (handleSummary), from k6's summary data. Kept short:
+// the settings, the request count, the failure rate and p95 per endpoint, so it can be shown at the exam.
+export function formatSummary(data, { baseUrl, rate, users, rampUp, duration }) {
+  const m = data.metrics;
+  const ms = (v) => `${Math.round(v)} ms`;
+  const held = (metric) => Object.values(metric?.thresholds || {}).every((t) => t.ok);
+  const allHeld = Object.values(m).every(held);
+  const lines = [
+    `SCRUM-198 HTTP load against ${baseUrl}`,
+    `RATE ${rate}/s, USERS ${users}, RAMP_UP ${rampUp}, DURATION ${duration}, ramp-down ${RAMP_DOWN}`,
+    '',
+    `${m.http_reqs?.values.count ?? 0} requests (${(m.http_reqs?.values.rate ?? 0).toFixed(1)}/s), ` +
+      `failed ${((m.http_req_failed?.values.rate ?? 0) * 100).toFixed(2)} %, ` +
+      `429 from the edge: ${m.rate_limited?.values.count ?? 0}`,
+    '',
+  ];
+  for (const e of ENDPOINTS) {
+    const d = m[`http_req_duration{endpoint:${e.name}}`];
+    if (!d) continue;
+    lines.push(`  ${e.name.padEnd(10)} avg ${ms(d.values.avg).padStart(7)}   p95 ${ms(d.values['p(95)']).padStart(7)}   ${held(d) ? 'OK' : 'FAILED'}`);
+  }
+  lines.push('', `Thresholds: ${allHeld ? 'all held' : 'FAILED'}`, '');
+  return lines.join('\n');
+}

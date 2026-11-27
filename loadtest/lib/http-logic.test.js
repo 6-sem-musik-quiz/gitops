@@ -1,7 +1,7 @@
 // Run with: node --test loadtest/lib/
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ENDPOINTS, pickEndpoint, httpUserName, durationMs, validateOptions } from './http-logic.js';
+import { ENDPOINTS, pickEndpoint, httpUserName, durationMs, validateOptions, formatSummary } from './http-logic.js';
 
 test('the weights add up to 100', () => {
   assert.equal(ENDPOINTS.reduce((sum, e) => sum + e.weight, 0), 100);
@@ -32,6 +32,25 @@ test('durationMs reads k6 durations in m and s', () => {
   assert.equal(durationMs('2m30s'), 150_000);
   assert.throws(() => durationMs('abc'));
   assert.throws(() => durationMs(''));
+});
+
+test('formatSummary shows the settings, p95 per endpoint and whether the thresholds held', () => {
+  const data = {
+    metrics: {
+      http_reqs: { values: { count: 1200, rate: 59.8 } },
+      http_req_failed: { values: { rate: 0.002 }, thresholds: { 'rate<0.01': { ok: true } } },
+      'http_req_duration{endpoint:weekly}': { values: { avg: 41.2, 'p(95)': 120.4, max: 300 }, thresholds: { 'p(95)<500': { ok: true } } },
+      'http_req_duration{endpoint:my_user}': { values: { avg: 80, 'p(95)': 612.9, max: 900 }, thresholds: { 'p(95)<500': { ok: false } } },
+      rate_limited: { values: { count: 0 }, thresholds: { 'count==0': { ok: true } } },
+    },
+  };
+  const text = formatSummary(data, { baseUrl: 'https://x', rate: 60, users: 20, rampUp: '1m', duration: '5m' });
+  assert.match(text, /RATE 60\/s/);
+  assert.match(text, /weekly\s+avg\s+41 ms\s+p95\s+120 ms\s+OK/);
+  assert.match(text, /my_user\s+avg\s+80 ms\s+p95\s+613 ms\s+FAILED/);
+  assert.match(text, /1200 requests \(59\.8\/s\)/);
+  assert.match(text, /failed 0\.20 %/);
+  assert.match(text, /Thresholds: FAILED/);
 });
 
 test('validateOptions accepts the defaults and rejects what would break the test', () => {
