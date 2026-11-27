@@ -21,4 +21,4 @@ spec:
   values: # overrides charts/quiz-service/values.yaml
     image:
       repository: ghcr.io/6-sem-musik-quiz/edgeservice
-      tag: 22-a7093e71-1795733741 # {"$imagepolicy": "quiz:edgeservice:tag"}
+      tag: 25-a30b1832-1795782104 # {"$imagepolicy": "quiz:edgeservice:tag"}
