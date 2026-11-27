@@ -106,6 +106,14 @@ player --GET--> media.munkcloud.dk (Cloudflare CDN) --cache miss--> Tunnel --> g
   roughly once per file instead of once per Cloudflare location.
 - Check: `curl -sI https://media.munkcloud.dk/test/cdn-test.txt` shows
   `cf-cache-status: HIT` from the second request on.
+- Response header rule "Slopster media: CORS": every response from `media.munkcloud.dk` gets
+  `Access-Control-Allow-Origin: *`. The game prefetches each song with `fetch(url, { mode: "cors" })`
+  (Frontend `gameAudio.js`), which the browser blocks without it; the game then fell back to
+  streaming the song live. Garage sends no CORS header, and Cloudflare does not keep separate
+  copies per Origin, so the header is added by Cloudflare after the cache, never by Garage.
+  The songs are public, so `*` (it also covers local development).
+- Check: `curl -sI -H "Origin: https://quiz.munkcloud.dk" https://media.munkcloud.dk/songs/<id>.mp3`
+  shows `Access-Control-Allow-Origin: *`.
 - Cache rule "Slopster frontend" (SCRUM-130): host `quiz.munkcloud.dk` and path starting
   with `/_framework/` is eligible for cache, edge and browser TTL = respect origin, 4xx/5xx
   never stored. nginx sends `public, max-age=31536000, immutable` for those files (their names
