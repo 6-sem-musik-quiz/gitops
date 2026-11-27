@@ -1,8 +1,8 @@
 # SCRUM-201: PostgreSQL scaled out on the X axis (AKF): one primary for reads and writes,
 # two read replicas that can only be read. Same databases and users as postgresql.yaml;
 # it replaces that release once the data is moved and the services point here.
-#   quizdb-primary.quiz.svc.cluster.local:5432  read and write (all services)
-#   quizdb-read.quiz.svc.cluster.local:5432     read only, spread over both replicas
+#   quizdb-postgresql-primary.quiz.svc.cluster.local:5432  read and write (all services)
+#   quizdb-postgresql-read.quiz.svc.cluster.local:5432     read only, spread over both replicas
 # Each pod has its own volume (no shared PVC), so a replica is a real copy: a new one
 # clones the primary with pg_basebackup when it starts.
 # No automatic failover: the chart never promotes a replica. If the primary is down,
@@ -58,12 +58,14 @@ spec:
         replicationPasswordKey: replication-password
       replicationUsername: repl_user
     replication:
-      # First boot runs asynchronously: the primary turns synchronous replication on before it
-      # runs the first-boot SQL, and with no replica connected yet that SQL would wait forever.
-      # Once both replicas stream, this becomes "remote_apply" with numSynchronousReplicas: 1:
-      # a commit returns when one replica has applied it, so reads there see it at once.
-      synchronousCommit: "off"
-      numSynchronousReplicas: 0
+      # A commit returns only when one replica has also written it to disk, so a confirmed write
+      # is never only on the primary. With two replicas one can be down; if both are, writes wait.
+      # "on" means saved on the replica, not yet applied: a read there can miss it for a moment.
+      # Bootstrapping a NEW cluster (empty volumes): set "off" / 0 for the first start. The image
+      # turns this on before it runs the first-boot SQL, which would then wait for a replica that
+      # is not there yet. Switch back once both replicas stream.
+      synchronousCommit: "on"
+      numSynchronousReplicas: 1
     primary:
       initdb:
         scriptsSecret: postgresql-initdb   # the same users and databases as postgresql.yaml
