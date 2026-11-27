@@ -117,6 +117,66 @@ spec:
           memory: 256Mi
         limits:
           memory: 512Mi
+    # SCRUM-203: a postgres-exporter sidecar on every pod (primary and replicas), scraped by Prometheus
+    # through the chart's ServiceMonitors (one for the primary, one for the replicas).
+    #   pg_up, pg_stat_database_*, ...         per pod
+    #   pg_replication_lag_seconds              on a replica: time since the last replayed transaction
+    #                                           (grows while the primary is idle; read it with the bytes below)
+    #   quizdb_replication_replay_lag_bytes     on the primary: how far behind each replica is, in WAL bytes
+    #   quizdb_replication_replay_lag_seconds     ...and in time (0 when a replica is caught up)
+    #   quizdb_replication_sync                 1 for the synchronous replica, 0 for the potential one
+    metrics:
+      enabled: true
+      image:
+        registry: registry-1.docker.io
+        repository: bitnami/postgres-exporter
+        digest: "sha256:25771a8ecb033d355c48b7aa2308357d4f56bc22e47971df502b9316eb55abc2"
+      resourcesPreset: none
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          memory: 64Mi
+      serviceMonitor:
+        enabled: true
+        interval: 30s
+      # One row per replica, from the primary's point of view. Empty on a replica.
+      customMetrics:
+        quizdb_replication:
+          query: >-
+            SELECT client_addr::text AS client_addr,
+                   application_name,
+                   state,
+                   sync_state,
+                   CASE WHEN sync_state = 'sync' THEN 1 ELSE 0 END AS sync,
+                   COALESCE(pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn), 0) AS replay_lag_bytes,
+                   COALESCE(EXTRACT(EPOCH FROM replay_lag), 0) AS replay_lag_seconds
+            FROM pg_stat_replication
+            WHERE NOT pg_is_in_recovery()
+          metrics:
+            - client_addr:
+                usage: LABEL
+                description: The replica's pod IP
+            - application_name:
+                usage: LABEL
+                description: The replication application name
+            - state:
+                usage: LABEL
+                description: streaming, catchup, ...
+            - sync_state:
+                usage: LABEL
+                description: sync or potential
+            - sync:
+                usage: GAUGE
+                description: 1 if this replica is the synchronous one
+            - replay_lag_bytes:
+                usage: GAUGE
+                description: WAL bytes the replica has not replayed yet
+            - replay_lag_seconds:
+                usage: GAUGE
+                description: Time the replica is behind in replaying (0 when caught up)
+
 ---
 # Postgres on the tailnet, so pgAdmin/psql work without kubectl port-forward:
 #   quiz-postgres.tail5a1bc5.ts.net:5432
