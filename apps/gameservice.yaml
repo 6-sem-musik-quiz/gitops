@@ -63,7 +63,7 @@ spec:
   values: # overrides charts/quiz-service/values.yaml
     image:
       repository: ghcr.io/6-sem-musik-quiz/gameservice
-      tag: 49-003ff07f-1795733776 # {"$imagepolicy": "quiz:gameservice:tag"}
+      tag: 51-aade6f4c-1795789572 # {"$imagepolicy": "quiz:gameservice:tag"}
     env:
       # Called inside the cluster (not through the edge) for the songs of a new game:
       # GET /api/playlists/{id}/songs/random. Without it the app falls back to its local-dev
