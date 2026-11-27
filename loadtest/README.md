@@ -1,191 +1,115 @@
-# Stresstest med k6 (SCRUM-197, 198 og 199)
+# Load-test af Slopster
 
-> **Skal du bare vise testen (fx til eksamen)?** Følg [EKSAMEN.md](EKSAMEN.md). Kort version, fra `gitops/`:
->
-> ```powershell
-> powershell -ExecutionPolicy Bypass -File .\loadtest\stress.ps1 -Check   # prøve (2-3 min)
-> powershell -ExecutionPolicy Bypass -File .\loadtest\stress.ps1          # demoen
-> ```
->
-> Første gang spørger scriptet efter bot-passwordet fra **OpenBao `kv/quiz/loadtest` → `bot-password`**.
-> Resten af denne side er detaljerne bag.
+Vi presser Slopster med k6 og ser Kubernetes skalere op (flere pods) og ned igen.
+**Til eksamen:** følg [EKSAMEN.md](EKSAMEN.md) trin for trin.
 
-To k6-scripts til eksamensdemoen af autoscaling (SCRUM-196):
+## Før første gang
 
-- `bots.js` (SCRUM-197): bots, der spiller rigtige Slopster-spil, så belastningen rammer hele kæden
-  User → Lobby → Game → RabbitMQ → Statistics. Beslutningen er beskrevet i Platform ADR-0005.
-- `http.js` (SCRUM-198): et fast antal HTTP-requests i sekundet mod de læsetunge endpoints, så HPA'en
-  skalerer hurtigt op, og så svartiden kan måles. Se [HTTP-load](#http-load-scrum-198).
+1. Installér k6: `winget install GrafanaLabs.k6` (åbn en ny terminal bagefter).
+2. Find bot-passwordet i **OpenBao: `kv/quiz/loadtest` → `bot-password`**. Scriptet spørger efter det
+   første gang og husker det (i `%USERPROFILE%\.slopster-loadtest`, ikke i git).
+3. Stå i `gitops`-mappen i PowerShell. Alle kommandoer herunder køres derfra.
 
-`stress.ps1` (SCRUM-199) starter begge med én kommando.
+> ⚠️ Kun én i gruppen kører ad gangen: alle bruger de samme testbrugere.
 
-Flux rører ikke denne mappe: den er ikke med i nogen `kustomization.yaml`.
+## Kommandoer
 
-| Fil | Hvad |
-|---|---|
-| `bots.js` | Botterne. Én k6-VU styrer én privat lobby med 2–8 bots (`loadbot_N`) og spiller spil efter spil med "Spil igen". |
-| `stress.ps1` | Én kommando til eksamensdemoen: `-Check` (prøve), standard (demo i tre vinduer), `-Cleanup`. Se [EKSAMEN.md](EKSAMEN.md). |
-| `EKSAMEN.md` | Trin for trin til eksamen for alle i gruppen. |
-| `http.js` | HTTP-load: `RATE` requests/s fordelt på leaderboard, egne stats, egen profil og playlister. |
-| `cleanup.js` | Sletter alle `loadbot_`-brugere (også `loadbot_h*` fra `http.js`) og deres stats via admin-endpoints. |
-| `lib/http-logic.js` | Endpoints og vægte, brugernavne, tjek af parametrene og opsummeringen til `http.js`. |
-| `results/` | Her gemmer `http.js` sit resultat (`http-<tid>Z.txt` og `.json`). |
-| `lib/signalr.js` | SignalR JSON-protokollen i hånden (handshake, `\x1e`, invocations, ping). |
-| `lib/bot-logic.js` | Hvor botten lægger sangen, hvornår den svarer, backoff til "Spil igen", brugernavne. |
+Alle starter med `powershell -ExecutionPolicy Bypass -File .\loadtest\stress.ps1`. Herunder forkortet til `stress.ps1`.
 
-## Forudsætninger
-
-- k6: `winget install GrafanaLabs.k6` (eller https://grafana.com/docs/k6/latest/set-up/install-k6/)
-- Edge'en tæller rate-limit pr. bruger (EdgeService, SCRUM-197). Uden den deler alle bots fra én maskine
-  én kvote på 100 requests / 10 s.
-- Admin-endpoints i UserService og StatisticService (SCRUM-197) for at kunne rydde op.
-
-## Bot-passwordet
-
-Alle testbrugere (`loadbot_N` fra botterne og `loadbot_h*` fra HTTP-loaden) har **samme password**, og
-gruppen deler det i **OpenBao: `kv/quiz/loadtest` → `bot-password`**. Det kommer aldrig i git.
-
-- `stress.ps1` spørger efter det første gang og gemmer det i `%USERPROFILE%\.slopster-loadtest`.
-- Kører du k6 direkte, så sæt det som miljøvariabel i terminalen (k6 læser den selv), så det ikke står i
-  kommandohistorikken:
-
-  ```powershell
-  $env:BOT_PASSWORD = Get-Content "$HOME\.slopster-loadtest"   # eller indsæt det fra OpenBao
-  ```
-
-- Ændres passwordet i OpenBao, har de eksisterende testbrugere stadig det gamle. Kør så oprydningen
-  (`stress.ps1 -Cleanup`) én gang, så oprettes de på ny med det nye.
-
-## Kør botterne direkte (bots.js)
-
-Fra `gitops/`, med `$env:BOT_PASSWORD` sat (se ovenfor):
-
-```powershell
-k6 run loadtest/bots.js
-```
-
-| Variabel | Standard | Betydning |
+| Jeg vil … | Kommando | Tid |
 |---|---|---|
-| `BASE_URL` | `https://quiz.munkcloud.dk` | Hvor botterne går ind (edge'en) |
-| `BOTS` | `50` | Antal bots i alt |
-| `BOTS_PER_LOBBY` | `4` | Bots pr. lobby (2–8) |
-| `RAMP_UP` | `1m` | Tid til at starte alle lobbyer |
-| `DURATION` | `5m` | Hvor længe alle lobbyer spiller |
-| `BOT_PASSWORD` | – | Påkrævet. Det fælles password fra OpenBao (se [Bot-passwordet](#bot-passwordet)) |
+| **tjekke, at alt virker** (dagen før) | `stress.ps1 -Check` | 3 min |
+| **køre hele demoen** (bots + HTTP + HPA-vindue) | `stress.ps1` | 8 min |
+| køre en **kortere demo** | `stress.ps1 -Duration 3m` | 5 min |
+| kun vise **svartid under pres** (HTTP-load) | `stress.ps1 -Only http` | 7 min |
+| kun vise **rigtige spil** (bots, RabbitMQ → statistik) | `stress.ps1 -Only bots` | 7 min |
+| køre **let** (svagt net, eller rigtige spillere er inde) | `stress.ps1 -Rate 30 -Bots 20` | 8 min |
+| køre **hårdt** (hvis pods ikke skalerer op) | `stress.ps1 -Rate 80 -Bots 20` | 8 min |
+| **rydde op** (sletter alle testbrugere, kræver Slopster-admin) | `stress.ps1 -Cleanup` | 10 s |
 
-Lille prøvekørsel først:
-
-```powershell
-k6 run -e BOTS=2 -e BOTS_PER_LOBBY=2 -e RAMP_UP=5s -e DURATION=1m loadtest/bots.js
-```
-
-### Inde i clusteret (ikke sat op)
-
-Testen køres fra en terminal mod den offentlige adresse, så trafikken går gennem Cloudflare og edge'en
-ligesom rigtige spillere. Skal den en dag køre inde i clusteret (mod `http://edgeservice:8080`), skal
-det være et Kubernetes Job lagt ind via en PR i dette repo. Ændringer i clusteret sker kun gennem gitops
-(AGENTS.md), ikke med `kubectl run`. `k6 archive loadtest/bots.js` pakker scriptet og `lib/` i én
-`archive.tar`, som et sådant Job kan køre med `k6 run archive.tar`.
-
-## Hvad du skal se
-
-**I terminalen** (k6's opsummering til sidst):
-
-- `bot_errors` ........ **0** (done-kriteriet: ingen fejl i bot-loggen; thresholden fejler ellers)
-- `games_completed` ... antal færdige spil
-- `answer_rtt` ........ svartid fra `SubmitAnswer` til serverens svar (avg, p95)
-- `http_req_duration` . REST-kald gennem edge'en
-- `rate_limited` ...... antal 429, som botten ventede ud (ikke en fejl)
-- `checks` ............ ≥ 99 %
-
-Fejl skrives med `[VU n]` og årsag, fx `start game: HTTP 409 ...`.
-
-**I Grafana**, dashboardet "Slopster Autoscaling": CPU stiger, og HPA'en skalerer
-gameservice/lobbyservice/edgeservice fra 2 op mod 5 pods. Når testen stopper, skalerer de ned efter
-ca. 2 minutter (scale-down-vinduet).
-
-**På leaderboardet:** `loadbot_`-spillere i ugens top (Slopster → Leaderboard, eller
-`GET /api/statisticservice/statistics/weekly`). Det viser, at `game.finished` er nået gennem RabbitMQ til
-StatisticService under load.
-
-## HTTP-load (SCRUM-198)
-
-Botterne giver ikke nok CPU-belastning til, at HPA'en reagerer hurtigt. `http.js` sender et **fast antal
-requests i sekundet** (k6's `ramping-arrival-rate`), uanset hvor hurtigt servicen svarer. Så kan resultatet
-siges i tal: "ved 60 requests/s holdt p95 sig under 500 ms, mens statisticservice gik fra 2 til 5 pods".
-
-Fra `gitops/`, med `$env:BOT_PASSWORD` sat (se [Bot-passwordet](#bot-passwordet)):
+Kopiér direkte:
 
 ```powershell
-k6 run loadtest/http.js
-```
-
-Lille prøvekørsel først:
-
-```powershell
-k6 run -e USERS=2 -e RATE=5 -e RAMP_UP=10s -e DURATION=20s loadtest/http.js
-```
-
-| Variabel | Standard | Betydning |
-|---|---|---|
-| `BASE_URL` | `https://quiz.munkcloud.dk` | Hvor requests går ind (edge'en) |
-| `USERS` | `20` | Testbrugere `loadbot_h1..N`. Hver logger ind én gang, og tokenet genbruges |
-| `RATE` | `60` | Requests i sekundet på plateauet |
-| `RAMP_UP` | `1m` | Tid fra 0 til `RATE` |
-| `DURATION` | `5m` | Plateauet. Derefter 30 s ned til 0 |
-| `BOT_PASSWORD` | – | Påkrævet. Det fælles password fra OpenBao |
-
-| Endpoint | Andel | Service |
-|---|---|---|
-| `GET /api/statisticservice/statistics/weekly` (leaderboard) | 40 % | statisticservice (Redis-cache, SCRUM-195) |
-| `GET /api/statisticservice/statistics/me` | 25 % | statisticservice |
-| `GET /api/userservice/users/me` | 20 % | userservice |
-| `GET /api/musicservice/playlists` | 15 % | musicservice |
-
-**Grænserne i edge'en**, og hvorfor scriptet ser ud, som det gør:
-
-- Uden token tæller edge'en pr. IP (100 / 10 s). Derfor er login ikke en del af belastningen: hver bruger
-  logger ind én gang i `setup()`, og ved 429 venter scriptet 10 s og prøver igen.
-- Med token tæller den pr. bruger (100 / 10 s). Scriptet afviser derfor `RATE` over 9 × `USERS`.
-- Alt fra én maskine har et loft på 1000 / 10 s, altså ca. 100 requests/s **inklusive botterne**, hvis de
-  kører samtidig. Kør fx `bots.js` med 50 bots og `http.js` med `RATE=60` hver i sin terminal.
-- Tokens lever 15 min og fornyes ikke, så en kørsel må højst vare 14 min i alt.
-
-**Leaderboardet læser kun fra Redis**, når StatisticService har sin Redis connection string
-(`apps/statisticservice.yaml`, SCRUM-195). Ellers måles Postgres.
-
-### Hvad du skal se
-
-**I terminalen og i `results/http-<tid>Z.txt`** (tiden er UTC):
-
-```
-1200 requests (59.8/s), failed 0.20 %, 429 from the edge: 0
-
-  weekly     avg   41 ms   p95  120 ms   OK
-  my_stats   ...
-Thresholds: all held
-```
-
-Thresholds: fejlrate < 1 %, p95 < 500 ms pr. endpoint og ingen 429. k6 afslutter med exit-kode 99, hvis en
-threshold fejler. `results/http-<tid>Z.json` er k6's fulde opsummering. Gem den kørsel, I vil vise ved
-eksamen (plan B, hvis live-demoen driller).
-
-**I Grafana**, dashboardet "Slopster Autoscaling": CPU stiger, og statisticservice skalerer fra 2 mod 5
-pods, efterfulgt af userservice og musicservice. Efter testen skalerer de ned efter ca. 2 minutter.
-
-## Ryd op bagefter
-
-Kræver en Slopster-konto med rollen **Admin** (den man logger ind med på siden). Scriptet spørger efter
-brugernavn og password, så de ikke står i kommandohistorikken:
-
-```powershell
+powershell -ExecutionPolicy Bypass -File .\loadtest\stress.ps1 -Check
+powershell -ExecutionPolicy Bypass -File .\loadtest\stress.ps1
+powershell -ExecutionPolicy Bypass -File .\loadtest\stress.ps1 -Duration 3m
+powershell -ExecutionPolicy Bypass -File .\loadtest\stress.ps1 -Only http
+powershell -ExecutionPolicy Bypass -File .\loadtest\stress.ps1 -Only bots
+powershell -ExecutionPolicy Bypass -File .\loadtest\stress.ps1 -Rate 30 -Bots 20
+powershell -ExecutionPolicy Bypass -File .\loadtest\stress.ps1 -Rate 80 -Bots 20
 powershell -ExecutionPolicy Bypass -File .\loadtest\stress.ps1 -Cleanup
 ```
 
-Sletter først bot-stats, derefter bot-brugere. Endpoints accepterer kun præfikset `loadbot_`. Bot-spillene
-forsvinder også fra ugens leaderboard. Ikke nødvendigt mellem kørsler, kun hvis bot-passwordet er ændret.
+**Parametre:** `-Rate` HTTP-requests i sekundet (standard 60) · `-Bots` antal bots (standard 50) ·
+`-RampUp` tid til fuld last (standard `1m`) · `-Duration` tid på fuld last (standard `5m`).
+Hold `-Rate` under ca. 90: alt fra én maskine deler edge'ens grænse på 1000 requests / 10 s.
 
-## Test af hjælpefunktionerne
+## Hvad du ser
+
+| Hvor | Godt tegn |
+|---|---|
+| **HPA-vinduet** (`kubectl get hpa -w`) eller **Grafana → [Quiz Overview](https://grafana-quiz.tail5a1bc5.ts.net/d/quiz-overview/quiz-overview)** (kræver Tailscale) | `REPLICAS` går fra 2 mod 5, og ned igen ca. 2 min efter testen |
+| **HTTP-vinduet**, til sidst | `failed 0.00 %`, `429 from the edge: 0`, p95 under 500 ms pr. endpoint, `Thresholds: all held` |
+| **Bots-vinduet**, til sidst | `bot_errors` = 0, `games_completed` > 0, `checks` ≥ 99 % |
+| **`loadtest/results/`** | HTTP-resultatet gemt som `http-<tid>Z.txt` og `.json` (tiden er UTC). Gem den kørsel, I vil vise |
+| **Leaderboardet** på siden | `loadbot_`-spillere i ugens top: spillene er nået via RabbitMQ til statistikken |
+
+## Hvis noget fejler
+
+Se tabellen i [EKSAMEN.md](EKSAMEN.md#6-hvis-noget-fejler). De to hyppigste:
+
+- `HTTP 401` ved login → forkert bot-password. Slet `%USERPROFILE%\.slopster-loadtest` og kør igen.
+- `409` og så `401` → testbrugerne findes med et andet password. Kør `stress.ps1 -Cleanup` én gang.
+
+---
+
+## Detaljer (til den, der vil ændre testene)
+
+### Filerne
+
+| Fil | Hvad |
+|---|---|
+| `stress.ps1` | Kommandoen ovenfor. Starter k6-scripts i egne vinduer og giver passwordet videre som miljøvariabel |
+| `bots.js` | SCRUM-197: bots, der spiller rigtige spil. Én k6-VU styrer én privat lobby med 2–8 bots (`loadbot_N`) |
+| `http.js` | SCRUM-198: et fast antal GET/s mod leaderboard (40 %), egne stats (25 %), egen profil (20 %) og playlister (15 %), med testbrugerne `loadbot_h1..N` |
+| `cleanup.js` | Sletter alle `loadbot_`-brugere og deres stats via admin-endpoints |
+| `lib/` | Ren logik med tests: SignalR-protokollen, bot-adfærd, endpoints og vægte, opsummering |
+| `results/` | Gemte resultater fra `http.js` |
+
+### Sådan virker de
+
+- **Botterne** går gennem hele kæden: User → Lobby → Game (SignalR over WebSocket) → RabbitMQ → Statistics.
+  De giver realistisk last, men ikke meget CPU. Beslutningen står i Platform ADR-0005.
+- **HTTP-loaden** bruger k6's `ramping-arrival-rate`: et fast antal requests i sekundet, uanset svartiden.
+  Så kan resultatet siges i tal: "ved 60 requests/s holdt p95 sig under 500 ms".
+- Hver testbruger logger ind **én gang** og genbruger sit token. Uden token tæller edge'en pr. IP
+  (100 / 10 s), med token pr. bruger (100 / 10 s). Derfor afviser `http.js` en `RATE` over 9 × `USERS`,
+  og en kørsel må højst vare 14 min (tokens lever 15 min).
+- Leaderboardet læses fra Redis (SCRUM-195).
+- Flux rører ikke denne mappe: den er ikke med i nogen `kustomization.yaml`.
+
+### Kør k6 direkte
+
+`stress.ps1` er nemmest, men scripts kan køres direkte. Sæt passwordet som miljøvariabel først:
+
+```powershell
+$env:BOT_PASSWORD = Get-Content "$HOME\.slopster-loadtest"
+k6 run -e BOTS=10 -e BOTS_PER_LOBBY=2 -e DURATION=2m loadtest/bots.js
+k6 run -e USERS=20 -e RATE=60 -e RAMP_UP=1m -e DURATION=5m loadtest/http.js
+```
+
+| Variabel | Script | Standard |
+|---|---|---|
+| `BASE_URL` | alle | `https://quiz.munkcloud.dk` |
+| `BOT_PASSWORD` | bots, http | – (påkrævet) |
+| `BOTS`, `BOTS_PER_LOBBY` | bots | `50`, `4` (2–8) |
+| `USERS`, `RATE` | http | `20`, `60` |
+| `RAMP_UP`, `DURATION` | bots, http | `1m`, `5m` |
+| `ADMIN_USER`, `ADMIN_PASSWORD` | cleanup | – (påkrævet) |
+
+Ændres bot-passwordet i OpenBao, har de eksisterende testbrugere stadig det gamle: kør `stress.ps1 -Cleanup` én gang.
+
+### Test af hjælpefunktionerne
 
 ```powershell
 cd loadtest; node --test "lib/*.test.js"
