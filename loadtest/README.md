@@ -1,15 +1,21 @@
-# Stresstest med k6 (SCRUM-197)
+# Stresstest med k6 (SCRUM-197 og SCRUM-198)
 
-k6-bots, der spiller rigtige Slopster-spil, så belastningen rammer hele kæden
-User → Lobby → Game → RabbitMQ → Statistics. Bruges til eksamensdemoen af autoscaling (SCRUM-196).
-Beslutningen er beskrevet i Platform ADR-0005.
+To k6-scripts til eksamensdemoen af autoscaling (SCRUM-196):
+
+- `bots.js` (SCRUM-197): bots, der spiller rigtige Slopster-spil, så belastningen rammer hele kæden
+  User → Lobby → Game → RabbitMQ → Statistics. Beslutningen er beskrevet i Platform ADR-0005.
+- `http.js` (SCRUM-198): et fast antal HTTP-requests i sekundet mod de læsetunge endpoints, så HPA'en
+  skalerer hurtigt op, og så svartiden kan måles. Se [HTTP-load](#http-load-scrum-198).
 
 Flux rører ikke denne mappe: den er ikke med i nogen `kustomization.yaml`.
 
 | Fil | Hvad |
 |---|---|
 | `bots.js` | Botterne. Én k6-VU styrer én privat lobby med 2–8 bots (`loadbot_N`) og spiller spil efter spil med "Spil igen". |
-| `cleanup.js` | Sletter alle `loadbot_`-brugere og deres stats via admin-endpoints. |
+| `http.js` | HTTP-load: `RATE` requests/s fordelt på leaderboard, egne stats, egen profil og playlister. |
+| `cleanup.js` | Sletter alle `loadbot_`-brugere (også `loadbot_h*` fra `http.js`) og deres stats via admin-endpoints. |
+| `lib/http-logic.js` | Endpoints og vægte, brugernavne, tjek af parametrene og opsummeringen til `http.js`. |
+| `results/` | Her gemmer `http.js` sit resultat (`http-<tid>Z.txt` og `.json`). |
 | `lib/signalr.js` | SignalR JSON-protokollen i hånden (handshake, `\x1e`, invocations, ping). |
 | `lib/bot-logic.js` | Hvor botten lægger sangen, hvornår den svarer, backoff til "Spil igen", brugernavne. |
 
@@ -71,6 +77,69 @@ ca. 2 minutter (scale-down-vinduet).
 **På leaderboardet:** `loadbot_`-spillere i ugens top (Slopster → Leaderboard, eller
 `GET /api/statisticservice/statistics/weekly`). Det viser, at `game.finished` er nået gennem RabbitMQ til
 StatisticService under load.
+
+## HTTP-load (SCRUM-198)
+
+Botterne giver ikke nok CPU-belastning til, at HPA'en reagerer hurtigt. `http.js` sender et **fast antal
+requests i sekundet** (k6's `ramping-arrival-rate`), uanset hvor hurtigt servicen svarer. Så kan resultatet
+siges i tal: "ved 60 requests/s holdt p95 sig under 500 ms, mens statisticservice gik fra 2 til 5 pods".
+
+```powershell
+k6 run -e BOT_PASSWORD=<samme-som-botterne> loadtest/http.js
+```
+
+Lille prøvekørsel først:
+
+```powershell
+k6 run -e BOT_PASSWORD=<...> -e USERS=2 -e RATE=5 -e RAMP_UP=10s -e DURATION=20s loadtest/http.js
+```
+
+| Variabel | Standard | Betydning |
+|---|---|---|
+| `BASE_URL` | `https://quiz.munkcloud.dk` | Hvor requests går ind (edge'en) |
+| `USERS` | `20` | Testbrugere `loadbot_h1..N`. Hver logger ind én gang, og tokenet genbruges |
+| `RATE` | `60` | Requests i sekundet på plateauet |
+| `RAMP_UP` | `1m` | Tid fra 0 til `RATE` |
+| `DURATION` | `5m` | Plateauet. Derefter 30 s ned til 0 |
+| `BOT_PASSWORD` | – | Påkrævet, mindst 8 tegn |
+
+| Endpoint | Andel | Service |
+|---|---|---|
+| `GET /api/statisticservice/statistics/weekly` (leaderboard) | 40 % | statisticservice (Redis-cache, SCRUM-195) |
+| `GET /api/statisticservice/statistics/me` | 25 % | statisticservice |
+| `GET /api/userservice/users/me` | 20 % | userservice |
+| `GET /api/musicservice/playlists` | 15 % | musicservice |
+
+**Grænserne i edge'en**, og hvorfor scriptet ser ud, som det gør:
+
+- Uden token tæller edge'en pr. IP (100 / 10 s). Derfor er login ikke en del af belastningen: hver bruger
+  logger ind én gang i `setup()`, og ved 429 venter scriptet 10 s og prøver igen.
+- Med token tæller den pr. bruger (100 / 10 s). Scriptet afviser derfor `RATE` over 9 × `USERS`.
+- Alt fra én maskine har et loft på 1000 / 10 s, altså ca. 100 requests/s **inklusive botterne**, hvis de
+  kører samtidig. Kør fx `bots.js` med 50 bots og `http.js` med `RATE=60` hver i sin terminal.
+- Tokens lever 15 min og fornyes ikke, så en kørsel må højst vare 14 min i alt.
+
+**Leaderboardet læser kun fra Redis**, når StatisticService har sin Redis connection string
+(`apps/statisticservice.yaml`, SCRUM-195). Ellers måles Postgres.
+
+### Hvad du skal se
+
+**I terminalen og i `results/http-<tid>Z.txt`** (tiden er UTC):
+
+```
+1200 requests (59.8/s), failed 0.20 %, 429 from the edge: 0
+
+  weekly     avg   41 ms   p95  120 ms   OK
+  my_stats   ...
+Thresholds: all held
+```
+
+Thresholds: fejlrate < 1 %, p95 < 500 ms pr. endpoint og ingen 429. k6 afslutter med exit-kode 99, hvis en
+threshold fejler. `results/http-<tid>Z.json` er k6's fulde opsummering. Gem den kørsel, I vil vise ved
+eksamen (plan B, hvis live-demoen driller).
+
+**I Grafana**, dashboardet "Slopster Autoscaling": CPU stiger, og statisticservice skalerer fra 2 mod 5
+pods, efterfulgt af userservice og musicservice. Efter testen skalerer de ned efter ca. 2 minutter.
 
 ## Ryd op bagefter
 
