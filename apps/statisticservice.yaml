@@ -2,7 +2,8 @@
 #
 # Secret: the connection strings, built from the passwords in OpenBao, and the JWT signing
 # key (kv/quiz/jwt, the same key UserService signs its tokens with). Without the key every
-# request to /api/statistics/* is rejected with 401 (SCRUM-188).
+# request to /api/statistics/* is rejected with 401 (SCRUM-188). The Redis password (kv/quiz/redis,
+# the same Redis as LobbyService and GameService) is for the leaderboard cache (SCRUM-195).
 #
 # Autoscaled by the chart's HPA (2-5 pods on CPU). RabbitMQ hands each message
 # to only one of the pods, so a result is never counted twice.
@@ -29,6 +30,9 @@ spec:
         RabbitMQ__Username: "{{ .rabbitUser }}"
         RabbitMQ__Password: "{{ .rabbitPassword }}"
         Jwt__SigningKey: "{{ .jwtSigningKey }}"
+        # SCRUM-195: the weekly leaderboard cache (write-through). Optional: without Redis the
+        # leaderboard is read from Postgres, so the HelmRelease does not depend on redis.
+        ConnectionStrings__Redis: "redis-master.quiz.svc.cluster.local:6379,password={{ .redisPassword }}"
   # Values fetched from OpenBao: secretKey = the name used in the template above.
   data:
     - secretKey: dbPassword
@@ -47,6 +51,10 @@ spec:
       remoteRef:
         key: quiz/jwt
         property: signing-key
+    - secretKey: redisPassword
+      remoteRef:
+        key: quiz/redis
+        property: password
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
