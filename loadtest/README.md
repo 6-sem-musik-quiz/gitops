@@ -7,11 +7,15 @@ To k6-scripts til eksamensdemoen af autoscaling (SCRUM-196):
 - `http.js` (SCRUM-198): et fast antal HTTP-requests i sekundet mod de læsetunge endpoints, så HPA'en
   skalerer hurtigt op, og så svartiden kan måles. Se [HTTP-load](#http-load-scrum-198).
 
+> **Til eksamen:** følg [EKSAMEN.md](EKSAMEN.md). `stress.ps1` (SCRUM-199) starter begge scripts med én kommando.
+
 Flux rører ikke denne mappe: den er ikke med i nogen `kustomization.yaml`.
 
 | Fil | Hvad |
 |---|---|
 | `bots.js` | Botterne. Én k6-VU styrer én privat lobby med 2–8 bots (`loadbot_N`) og spiller spil efter spil med "Spil igen". |
+| `stress.ps1` | Én kommando til eksamensdemoen: `-Check` (prøve), standard (demo i tre vinduer), `-Cleanup`. Se [EKSAMEN.md](EKSAMEN.md). |
+| `EKSAMEN.md` | Trin for trin til eksamen for alle i gruppen. |
 | `http.js` | HTTP-load: `RATE` requests/s fordelt på leaderboard, egne stats, egen profil og playlister. |
 | `cleanup.js` | Sletter alle `loadbot_`-brugere (også `loadbot_h*` fra `http.js`) og deres stats via admin-endpoints. |
 | `lib/http-logic.js` | Endpoints og vægte, brugernavne, tjek af parametrene og opsummeringen til `http.js`. |
