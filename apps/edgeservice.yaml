@@ -4,7 +4,7 @@
 # to http://<service>:8080/api/<rest>, e.g. /api/userservice/users/1 -> userservice
 # /api/users/1. The edge's own endpoints are under /api/edge.
 # The routes live in the EdgeService repo (appsettings.json), not here.
-# Autoscaled by the chart's HPA (2-5 pods): the single entry point keeps one pod up during a rollout.
+# Autoscaled by the chart's HPA (2-10 pods): the single entry point keeps one pod up during a rollout.
 #
 # SCRUM-174/175/194: the edge holds the maintenance flags ("design to be disabled") in Redis and
 # answers 503 for a switched-off service. It needs the Redis connection string and the JWT signing
@@ -50,6 +50,8 @@ spec:
         kind: GitRepository # this repo, as Flux knows it
         name: quiz
   values: # overrides charts/quiz-service/values.yaml
+    autoscaling:
+      maxReplicas: 10 # stress test 2026-11-27: hit the chart's 5 while the node used 1.7 of 5 cores
     image:
       repository: ghcr.io/6-sem-musik-quiz/edgeservice
       tag: 27-e168dffa-1795789552 # {"$imagepolicy": "quiz:edgeservice:tag"}

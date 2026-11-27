@@ -11,7 +11,7 @@ image:
 # The percentage is of resources.requests.cpu below.
 autoscaling:
   minReplicas: 2                       # 2, so one pod can die or be replaced without downtime
-  maxReplicas: 5
+  maxReplicas: 5                       # upper limit; raised to 10 per service in apps/*.yaml where needed
   targetCPUUtilizationPercentage: 70   # add pods when the average is above 70 % of the request
   scaleDownStabilizationSeconds: 120   # low load this long before pods are removed (Kubernetes' default is 300)
 

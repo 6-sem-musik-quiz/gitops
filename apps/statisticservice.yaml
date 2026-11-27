@@ -5,7 +5,7 @@
 # request to /api/statistics/* is rejected with 401 (SCRUM-188). The Redis password (kv/quiz/redis,
 # the same Redis as LobbyService and GameService) is for the leaderboard cache (SCRUM-195).
 #
-# Autoscaled by the chart's HPA (2-5 pods on CPU). RabbitMQ hands each message
+# Autoscaled by the chart's HPA (2-10 pods on CPU). RabbitMQ hands each message
 # to only one of the pods, so a result is never counted twice.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
@@ -72,6 +72,8 @@ spec:
         kind: GitRepository # this repo, as Flux knows it
         name: quiz
   values: # overrides charts/quiz-service/values.yaml
+    autoscaling:
+      maxReplicas: 10 # stress test 2026-11-27: hit the chart's 5 while the node used 1.7 of 5 cores
     image:
       repository: ghcr.io/6-sem-musik-quiz/statisticservice
       tag: 46-a19854d8-1795784329 # {"$imagepolicy": "quiz:statisticservice:tag"}

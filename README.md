@@ -170,7 +170,7 @@ The Deployment has no `replicas`, so Flux never resets the HPA's pod count:
 | Value | Default | Meaning |
 |---|---|---|
 | `autoscaling.minReplicas` | `2` | pods when idle (2, so one can die or roll out without downtime) |
-| `autoscaling.maxReplicas` | `5` | upper limit per service |
+| `autoscaling.maxReplicas` | `5` | upper limit per service; `10` for edge, game, user and statistics (`apps/*.yaml`) |
 | `autoscaling.targetCPUUtilizationPercentage` | `70` | average CPU use in % of `resources.requests.cpu` that the HPA aims for |
 | `autoscaling.scaleDownStabilizationSeconds` | `120` | low load this long before pods are removed (Kubernetes' default is 300) |
 
@@ -182,18 +182,24 @@ the pods use more than 35m CPU on average. It reads CPU from metrics-server (par
 
 The namespace has no ResourceQuota anymore (the homelab only runs the quiz), so
 the limit is the node: 1 k3s node with 5 CPU and about 19.5 GiB allocatable.
-At the maximum (5 pods for each of the 5 services):
+The scheduler reserves each pod's **request**, so CPU requests decide how many pods fit.
 
-| | per pod (request / memory limit) | × 5 pods × services | total request | total memory limit |
+| | per pod (request / memory limit) | pods at max | total request | total memory limit |
 |---|---|---|---|---|
-| 4 .NET services | 50m CPU, 96Mi / 256Mi | × 5 × 4 = 20 pods | 1000m, 1920Mi | 5120Mi |
-| frontend (nginx) | 20m CPU, 32Mi / 128Mi | × 5 × 1 = 5 pods | 100m, 160Mi | 640Mi |
-| **all at max** | | 25 pods | **1.1 CPU, 2.0 GiB** | **5.6 GiB** |
-| idle (min 2 each) | | 10 pods | 0.44 CPU, 0.8 GiB | 2.3 GiB |
+| edge, game, user, statistics | 50m CPU, 96Mi / 256Mi | × 10 × 4 = 40 | 2000m, 3840Mi | 10240Mi |
+| lobby, music | 50m CPU, 96Mi / 256Mi | × 5 × 2 = 10 | 500m, 960Mi | 2560Mi |
+| frontend (nginx) | 20m CPU, 32Mi / 128Mi | × 5 = 5 | 100m, 160Mi | 640Mi |
+| **all at max** | | 55 pods | **2.6 CPU, 4.9 GiB** | **13.1 GiB** |
+| idle (min 2 each) | | 14 pods | 0.64 CPU, 1.2 GiB | 3.3 GiB |
 
-That fits next to Postgres, Redis, RabbitMQ and Garage and the homelab's own
-pods. Requests are what the scheduler reserves; CPU has no limit, so a busy pod
-can use free CPU on the node (and the HPA still sees it as > 100 %).
+Everything else on the node (Postgres, Redis, RabbitMQ, Garage, monitoring, the
+homelab) requests about 1.7 CPU, so all quiz services at their maximum reserve
+about 4.3 of the 5 CPU. Every service at 10 would be about 4.9: too tight, so only
+the four that reached 5 in the stress test (2026-11-27) got 10.
+
+Requests are what the scheduler reserves; CPU has no limit, so a busy pod can use
+free CPU on the node (and the HPA still sees it as > 100 %). On one node more pods
+share the same 5 cores: in the stress test the node used at most 1.7 of them.
 More nodes would only raise `maxReplicas`; the services need no change.
 
 ### See it scale
