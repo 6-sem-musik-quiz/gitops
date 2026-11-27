@@ -1,0 +1,89 @@
+# SCRUM-201: PostgreSQL scaled out on the X axis (AKF): one primary for reads and writes,
+# two read replicas that can only be read. Same databases and users as postgresql.yaml;
+# it replaces that release once the data is moved and the services point here.
+#   quizdb-primary.quiz.svc.cluster.local:5432  read and write (all services)
+#   quizdb-read.quiz.svc.cluster.local:5432     read only, spread over both replicas
+# Each pod has its own volume (no shared PVC), so a replica is a real copy: a new one
+# clones the primary with pg_basebackup when it starts.
+# No automatic failover: the chart never promotes a replica. If the primary is down,
+# reads go on but writes stop until it is back. Accepted for the project (ADR-0005).
+# No HPA: the number of replicas is fixed in this file and changed by hand.
+
+# The admin and the replication password, from OpenBao kv/quiz/postgres.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: quizdb-auth
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: SecretStore
+    name: openbao
+  target:
+    name: quizdb-auth
+  data:
+    - secretKey: postgres-password
+      remoteRef:
+        key: quiz/postgres
+        property: postgres-password
+    - secretKey: replication-password
+      remoteRef:
+        key: quiz/postgres
+        property: replication-password
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: quizdb
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: postgresql
+      version: "18.12.20"             # the same pinned chart as postgresql.yaml
+      sourceRef:
+        kind: HelmRepository
+        name: bitnami
+  values:
+    # The same PostgreSQL 18.7 image as postgresql.yaml, pinned by digest.
+    image:
+      registry: registry-1.docker.io
+      repository: bitnami/postgresql
+      digest: "sha256:ec2ef1dfb067c66aa83081405438e80786b4fae4647ca94330e0fc94398b9207"
+    architecture: replication
+    auth:
+      existingSecret: quizdb-auth
+      secretKeys:
+        adminPasswordKey: postgres-password
+        replicationPasswordKey: replication-password
+      replicationUsername: repl_user
+    replication:
+      # First boot runs asynchronously: the primary turns synchronous replication on before it
+      # runs the first-boot SQL, and with no replica connected yet that SQL would wait forever.
+      # Once both replicas stream, this becomes "remote_apply" with numSynchronousReplicas: 1:
+      # a commit returns when one replica has applied it, so reads there see it at once.
+      synchronousCommit: "off"
+      numSynchronousReplicas: 0
+    primary:
+      initdb:
+        scriptsSecret: postgresql-initdb   # the same users and databases as postgresql.yaml
+      persistence:
+        size: 2Gi
+      resourcesPreset: none
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          memory: 512Mi
+    readReplicas:
+      replicaCount: 2
+      persistence:
+        size: 2Gi                      # its own volume per replica
+      resourcesPreset: none
+      resources:
+        requests:
+          cpu: 50m
+          memory: 256Mi
+        limits:
+          memory: 512Mi

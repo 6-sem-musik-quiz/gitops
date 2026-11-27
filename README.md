@@ -11,6 +11,7 @@ charts/quiz-service/        our own Helm chart, used by every service
 infrastructure/
   bitnami.yaml              the Bitnami chart repo (as in class)
   postgresql.yaml           1 Postgres, 1 database + 1 user per service
+  quizdb.yaml               Postgres primary + 2 read replicas (SCRUM-201, replaces postgresql.yaml)
   redis.yaml                cache for LobbyService
   rabbitmq.yaml             GameFinished from GameService -> StatisticService and LobbyService (plain YAML)
   garage.yaml               BlobStorage for the song files, behind Cloudflare CDN (Garage's chart from git)
@@ -36,6 +37,8 @@ Never edit an image tag by hand; Flux owns the lines with `{"$imagepolicy": ...}
 | edgeservice (YARP) | the internet | `https://quiz.munkcloud.dk/api/<service>/*`, own endpoints at `/api/edge` |
 | userservice, lobbyservice, gameservice, musicservice, statisticservice | inside the cluster only | `http://<name>:8080` |
 | postgresql | inside the cluster only | `postgresql:5432` |
+| quizdb (primary) | inside the cluster only | `quizdb-primary:5432` (read and write) |
+| quizdb (replicas) | inside the cluster only | `quizdb-read:5432` (read only) |
 | redis | inside the cluster only | `redis-master:6379` |
 | rabbitmq | inside the cluster only | `rabbitmq:5672`, UI on 15672 |
 | garage (S3 API) | inside the cluster only | `http://garage:3900`, region `garage`, path-style |
