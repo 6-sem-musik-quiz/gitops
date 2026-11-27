@@ -1,4 +1,14 @@
-# Stresstest med k6 (SCRUM-197 og SCRUM-198)
+# Stresstest med k6 (SCRUM-197, 198 og 199)
+
+> **Skal du bare vise testen (fx til eksamen)?** Følg [EKSAMEN.md](EKSAMEN.md). Kort version, fra `gitops/`:
+>
+> ```powershell
+> powershell -ExecutionPolicy Bypass -File .\loadtest\stress.ps1 -Check   # prøve (2-3 min)
+> powershell -ExecutionPolicy Bypass -File .\loadtest\stress.ps1          # demoen
+> ```
+>
+> Første gang spørger scriptet efter bot-passwordet fra **OpenBao `kv/quiz/loadtest` → `bot-password`**.
+> Resten af denne side er detaljerne bag.
 
 To k6-scripts til eksamensdemoen af autoscaling (SCRUM-196):
 
@@ -7,11 +17,15 @@ To k6-scripts til eksamensdemoen af autoscaling (SCRUM-196):
 - `http.js` (SCRUM-198): et fast antal HTTP-requests i sekundet mod de læsetunge endpoints, så HPA'en
   skalerer hurtigt op, og så svartiden kan måles. Se [HTTP-load](#http-load-scrum-198).
 
+`stress.ps1` (SCRUM-199) starter begge med én kommando.
+
 Flux rører ikke denne mappe: den er ikke med i nogen `kustomization.yaml`.
 
 | Fil | Hvad |
 |---|---|
 | `bots.js` | Botterne. Én k6-VU styrer én privat lobby med 2–8 bots (`loadbot_N`) og spiller spil efter spil med "Spil igen". |
+| `stress.ps1` | Én kommando til eksamensdemoen: `-Check` (prøve), standard (demo i tre vinduer), `-Cleanup`. Se [EKSAMEN.md](EKSAMEN.md). |
+| `EKSAMEN.md` | Trin for trin til eksamen for alle i gruppen. |
 | `http.js` | HTTP-load: `RATE` requests/s fordelt på leaderboard, egne stats, egen profil og playlister. |
 | `cleanup.js` | Sletter alle `loadbot_`-brugere (også `loadbot_h*` fra `http.js`) og deres stats via admin-endpoints. |
 | `lib/http-logic.js` | Endpoints og vægte, brugernavne, tjek af parametrene og opsummeringen til `http.js`. |
@@ -26,12 +40,28 @@ Flux rører ikke denne mappe: den er ikke med i nogen `kustomization.yaml`.
   én kvote på 100 requests / 10 s.
 - Admin-endpoints i UserService og StatisticService (SCRUM-197) for at kunne rydde op.
 
-## Kør stresstesten
+## Bot-passwordet
 
-Fra `gitops/`, med et password du selv vælger til botterne (mindst 8 tegn, kommer aldrig i git):
+Alle testbrugere (`loadbot_N` fra botterne og `loadbot_h*` fra HTTP-loaden) har **samme password**, og
+gruppen deler det i **OpenBao: `kv/quiz/loadtest` → `bot-password`**. Det kommer aldrig i git.
+
+- `stress.ps1` spørger efter det første gang og gemmer det i `%USERPROFILE%\.slopster-loadtest`.
+- Kører du k6 direkte, så sæt det som miljøvariabel i terminalen (k6 læser den selv), så det ikke står i
+  kommandohistorikken:
+
+  ```powershell
+  $env:BOT_PASSWORD = Get-Content "$HOME\.slopster-loadtest"   # eller indsæt det fra OpenBao
+  ```
+
+- Ændres passwordet i OpenBao, har de eksisterende testbrugere stadig det gamle. Kør så oprydningen
+  (`stress.ps1 -Cleanup`) én gang, så oprettes de på ny med det nye.
+
+## Kør botterne direkte (bots.js)
+
+Fra `gitops/`, med `$env:BOT_PASSWORD` sat (se ovenfor):
 
 ```powershell
-k6 run -e BOT_PASSWORD=<vælg-et> loadtest/bots.js
+k6 run loadtest/bots.js
 ```
 
 | Variabel | Standard | Betydning |
@@ -41,12 +71,12 @@ k6 run -e BOT_PASSWORD=<vælg-et> loadtest/bots.js
 | `BOTS_PER_LOBBY` | `4` | Bots pr. lobby (2–8) |
 | `RAMP_UP` | `1m` | Tid til at starte alle lobbyer |
 | `DURATION` | `5m` | Hvor længe alle lobbyer spiller |
-| `BOT_PASSWORD` | – | Påkrævet. Samme password hver gang, ellers kan eksisterende bots ikke logge ind |
+| `BOT_PASSWORD` | – | Påkrævet. Det fælles password fra OpenBao (se [Bot-passwordet](#bot-passwordet)) |
 
 Lille prøvekørsel først:
 
 ```powershell
-k6 run -e BOTS=2 -e BOTS_PER_LOBBY=2 -e RAMP_UP=5s -e DURATION=1m -e BOT_PASSWORD=<...> loadtest/bots.js
+k6 run -e BOTS=2 -e BOTS_PER_LOBBY=2 -e RAMP_UP=5s -e DURATION=1m loadtest/bots.js
 ```
 
 ### Inde i clusteret (ikke sat op)
@@ -84,14 +114,16 @@ Botterne giver ikke nok CPU-belastning til, at HPA'en reagerer hurtigt. `http.js
 requests i sekundet** (k6's `ramping-arrival-rate`), uanset hvor hurtigt servicen svarer. Så kan resultatet
 siges i tal: "ved 60 requests/s holdt p95 sig under 500 ms, mens statisticservice gik fra 2 til 5 pods".
 
+Fra `gitops/`, med `$env:BOT_PASSWORD` sat (se [Bot-passwordet](#bot-passwordet)):
+
 ```powershell
-k6 run -e BOT_PASSWORD=<samme-som-botterne> loadtest/http.js
+k6 run loadtest/http.js
 ```
 
 Lille prøvekørsel først:
 
 ```powershell
-k6 run -e BOT_PASSWORD=<...> -e USERS=2 -e RATE=5 -e RAMP_UP=10s -e DURATION=20s loadtest/http.js
+k6 run -e USERS=2 -e RATE=5 -e RAMP_UP=10s -e DURATION=20s loadtest/http.js
 ```
 
 | Variabel | Standard | Betydning |
@@ -101,7 +133,7 @@ k6 run -e BOT_PASSWORD=<...> -e USERS=2 -e RATE=5 -e RAMP_UP=10s -e DURATION=20s
 | `RATE` | `60` | Requests i sekundet på plateauet |
 | `RAMP_UP` | `1m` | Tid fra 0 til `RATE` |
 | `DURATION` | `5m` | Plateauet. Derefter 30 s ned til 0 |
-| `BOT_PASSWORD` | – | Påkrævet, mindst 8 tegn |
+| `BOT_PASSWORD` | – | Påkrævet. Det fælles password fra OpenBao |
 
 | Endpoint | Andel | Service |
 |---|---|---|
@@ -143,13 +175,15 @@ pods, efterfulgt af userservice og musicservice. Efter testen skalerer de ned ef
 
 ## Ryd op bagefter
 
-Med en admin-bruger:
+Kræver en Slopster-konto med rollen **Admin** (den man logger ind med på siden). Scriptet spørger efter
+brugernavn og password, så de ikke står i kommandohistorikken:
 
 ```powershell
-k6 run -e ADMIN_USER=<admin> -e ADMIN_PASSWORD=<...> loadtest/cleanup.js
+powershell -ExecutionPolicy Bypass -File .\loadtest\stress.ps1 -Cleanup
 ```
 
-Sletter først bot-stats, derefter bot-brugere. Endpoints accepterer kun præfikset `loadbot_`.
+Sletter først bot-stats, derefter bot-brugere. Endpoints accepterer kun præfikset `loadbot_`. Bot-spillene
+forsvinder også fra ugens leaderboard. Ikke nødvendigt mellem kørsler, kun hvis bot-passwordet er ændret.
 
 ## Test af hjælpefunktionerne
 
