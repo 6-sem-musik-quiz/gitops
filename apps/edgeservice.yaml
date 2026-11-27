@@ -52,6 +52,6 @@ spec:
   values: # overrides charts/quiz-service/values.yaml
     image:
       repository: ghcr.io/6-sem-musik-quiz/edgeservice
-      tag: 25-a30b1832-1795782104 # {"$imagepolicy": "quiz:edgeservice:tag"}
+      tag: 27-e168dffa-1795789552 # {"$imagepolicy": "quiz:edgeservice:tag"}
     envFromSecrets: # the Secret made by the ExternalSecret above
       - edgeservice-secrets
