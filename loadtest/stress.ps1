@@ -3,6 +3,7 @@ SCRUM-199: one command for the load-test demo at the exam (SCRUM-196). See loadt
 
   .\loadtest\stress.ps1 -Check     # 2-3 min trial with a few users: run it the day before the exam
   .\loadtest\stress.ps1            # the demo: bots + HTTP load (+ kubectl get hpa -w) in their own windows
+  .\loadtest\stress.ps1 -Only http # only one of them (http or bots); -Rate, -Bots, -RampUp, -Duration change the load
   .\loadtest\stress.ps1 -Cleanup   # delete all loadbot_ users and their stats (needs a Slopster Admin login)
 
 The bot password is shared by the group in OpenBao (kv/quiz/loadtest -> bot-password). The first run asks
@@ -15,6 +16,8 @@ Works in Windows PowerShell 5.1 and PowerShell 7. ASCII only, so 5.1 reads it wi
 param(
     [switch]$Check,
     [switch]$Cleanup,
+    [ValidateSet('both', 'bots', 'http')]
+    [string]$Only = 'both',   # the demo: run both tests, only the bots or only the HTTP load
     [int]$Bots = 50,
     [int]$Rate = 60,
     [string]$RampUp = '1m',
@@ -96,8 +99,15 @@ if ($Check) {
 
 # The demo. Bots first (they log in during RAMP_UP), the HTTP load in its own window next to them.
 $users = [Math]::Max(20, [Math]::Ceiling($Rate / 9))   # the edge allows about 9 requests/s per user
-Start-Window 'Slopster bots (SCRUM-197)' "& '$($script:k6)' run -e BASE_URL=$BaseUrl -e BOTS=$Bots -e RAMP_UP=$RampUp -e DURATION=$Duration loadtest/bots.js"
-Start-Window 'Slopster HTTP load (SCRUM-198)' "& '$($script:k6)' run -e BASE_URL=$BaseUrl -e USERS=$users -e RATE=$Rate -e RAMP_UP=$RampUp -e DURATION=$Duration loadtest/http.js"
+$started = @()
+if ($Only -ne 'http') {
+    Start-Window 'Slopster bots (SCRUM-197)' "& '$($script:k6)' run -e BASE_URL=$BaseUrl -e BOTS=$Bots -e RAMP_UP=$RampUp -e DURATION=$Duration loadtest/bots.js"
+    $started += "$Bots bots"
+}
+if ($Only -ne 'bots') {
+    Start-Window 'Slopster HTTP load (SCRUM-198)' "& '$($script:k6)' run -e BASE_URL=$BaseUrl -e USERS=$users -e RATE=$Rate -e RAMP_UP=$RampUp -e DURATION=$Duration loadtest/http.js"
+    $started += "$Rate requests/s ($users users)"
+}
 if (Get-Command kubectl -ErrorAction SilentlyContinue) {
     Start-Window 'Slopster HPA' 'kubectl -n quiz get hpa -w'
 } else {
@@ -105,7 +115,7 @@ if (Get-Command kubectl -ErrorAction SilentlyContinue) {
 }
 
 Write-Host ''
-Write-Host "Started: $Bots bots + $Rate requests/s ($users users), ramp-up $RampUp, plateau $Duration." -ForegroundColor Green
+Write-Host "Started: $($started -join ' + '), ramp-up $RampUp, plateau $Duration." -ForegroundColor Green
 Write-Host 'Now open Grafana, dashboard "Slopster Autoscaling", and watch the pods go from 2 towards 5.'
 Write-Host 'The HTTP result is saved in loadtest/results/ when its window says "Thresholds".'
 Write-Host 'After the demo the pods scale down again in about 2 minutes.'
