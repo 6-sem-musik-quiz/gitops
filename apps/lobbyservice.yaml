@@ -67,7 +67,7 @@ spec:
   values: # overrides charts/quiz-service/values.yaml
     image:
       repository: ghcr.io/6-sem-musik-quiz/lobbyservice
-      tag: 47-21c13758-1795733787 # {"$imagepolicy": "quiz:lobbyservice:tag"}
+      tag: 49-7068e604-1795789575 # {"$imagepolicy": "quiz:lobbyservice:tag"}
     probes:
       readinessPath: /health/ready # ready only when Redis answers
     env:
