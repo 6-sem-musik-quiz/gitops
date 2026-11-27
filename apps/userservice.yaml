@@ -52,6 +52,6 @@ spec:
   values: # overrides charts/quiz-service/values.yaml
     image:
       repository: ghcr.io/6-sem-musik-quiz/userservice
-      tag: 38-c5b5c3d1-1795733798 # {"$imagepolicy": "quiz:userservice:tag"}
+      tag: 41-700b3ec5-1795782122 # {"$imagepolicy": "quiz:userservice:tag"}
     envFromSecrets: # the Secret made by the ExternalSecret above
       - userservice-secrets
