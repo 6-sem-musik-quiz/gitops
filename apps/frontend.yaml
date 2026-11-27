@@ -21,7 +21,7 @@ spec:
   values: # overrides charts/quiz-service/values.yaml
     image:
       repository: ghcr.io/6-sem-musik-quiz/frontend
-      tag: 93-2dc44f9e-1795787893 # {"$imagepolicy": "quiz:frontend:tag"}
+      tag: 95-777100b5-1795788783 # {"$imagepolicy": "quiz:frontend:tag"}
     runAsUser: 101 # the nginx user in nginx-unprivileged
     otel:
       enabled: false # static files: nothing to trace on the server
