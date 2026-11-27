@@ -104,9 +104,9 @@ spec:
   type: LoadBalancer
   loadBalancerClass: tailscale         # the Tailscale operator makes the tailnet address
   allocateLoadBalancerNodePorts: false # node ports are not allowed in quiz
-  selector:                            # the Postgres pod made by the chart
+  selector:                            # SCRUM-201: the quizdb primary (read and write)
     app.kubernetes.io/component: primary
-    app.kubernetes.io/instance: postgresql
+    app.kubernetes.io/instance: quizdb
     app.kubernetes.io/name: postgresql
   ports:
     - name: tcp-postgresql

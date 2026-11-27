@@ -20,7 +20,7 @@ spec:
     template:
       engineVersion: v2
       data:
-        ConnectionStrings__Default: "Host=postgresql.quiz.svc.cluster.local;Port=5432;Database=musicservice;Username=musicservice;Password={{ .dbPassword }}"
+        ConnectionStrings__Default: "Host=quizdb-postgresql-primary.quiz.svc.cluster.local;Port=5432;Database=musicservice;Username=musicservice;Password={{ .dbPassword }}"
         BlobStorage__AccessKeyId: "{{ .blobAccessKeyId }}"
         BlobStorage__SecretAccessKey: "{{ .blobSecretAccessKey }}"
         Jwt__SigningKey: "{{ .jwtSigningKey }}"
