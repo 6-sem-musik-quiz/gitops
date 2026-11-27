@@ -64,6 +64,6 @@ spec:
   values: # overrides charts/quiz-service/values.yaml
     image:
       repository: ghcr.io/6-sem-musik-quiz/statisticservice
-      tag: 39-75b4bea2-1795733824 # {"$imagepolicy": "quiz:statisticservice:tag"}
+      tag: 42-5fb02231-1795782135 # {"$imagepolicy": "quiz:statisticservice:tag"}
     envFromSecrets: # the Secret made by the ExternalSecret above
       - statisticservice-secrets
