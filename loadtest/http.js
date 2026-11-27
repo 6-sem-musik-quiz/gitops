@@ -85,6 +85,8 @@ function post(path, body) {
     res = http.post(BASE_URL + path, JSON.stringify(body), {
       headers: { 'Content-Type': 'application/json' },
       tags: { name: path, phase: 'setup' },
+      // 409 (user exists) is expected and must not count in http_req_failed, the < 1 % threshold
+      responseCallback: http.expectedStatuses(200, 201, 409),
     });
     if (res.status !== 429) return res;
     sleep(10);
