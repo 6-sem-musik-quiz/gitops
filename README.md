@@ -10,8 +10,7 @@ kustomization.yaml          entry point (infrastructure + apps)
 charts/quiz-service/        our own Helm chart, used by every service
 infrastructure/
   bitnami.yaml              the Bitnami chart repo (as in class)
-  postgresql.yaml           1 Postgres, 1 database + 1 user per service
-  quizdb.yaml               Postgres primary + 2 read replicas (SCRUM-201, replaces postgresql.yaml)
+  quizdb.yaml               Postgres primary + 2 read replicas, 1 database + 1 user per service
   redis.yaml                cache for LobbyService
   rabbitmq.yaml             GameFinished from GameService -> StatisticService and LobbyService (plain YAML)
   garage.yaml               BlobStorage for the song files, behind Cloudflare CDN (Garage's chart from git)
@@ -36,7 +35,6 @@ Never edit an image tag by hand; Flux owns the lines with `{"$imagepolicy": ...}
 | frontend | the internet | `https://quiz.munkcloud.dk` (Cloudflare Tunnel) |
 | edgeservice (YARP) | the internet | `https://quiz.munkcloud.dk/api/<service>/*`, own endpoints at `/api/edge` |
 | userservice, lobbyservice, gameservice, musicservice, statisticservice | inside the cluster only | `http://<name>:8080` |
-| postgresql | inside the cluster only | `postgresql:5432` |
 | quizdb (primary) | inside the cluster only | `quizdb-postgresql-primary:5432` (read and write) |
 | quizdb (replicas) | inside the cluster only | `quizdb-postgresql-read:5432` (read only) |
 | redis | inside the cluster only | `redis-master:6379` |
@@ -227,17 +225,17 @@ Postgres is on the tailnet as `quiz-postgres.tail5a1bc5.ts.net:5432` (the
 Service `postgresql-tailnet`). With Tailscale on, connect straight to it; no
 port-forward is needed. Your Tailscale ACL must allow that host.
 
-Fallback without tailnet access: `kubectl -n quiz port-forward svc/postgresql 15432:5432`
+Fallback without tailnet access: `kubectl -n quiz port-forward svc/quizdb-postgresql-primary 15432:5432`
 and use host `localhost`, port `15432` (not 5432, which a local Postgres may already use).
 
 Get the admin password:
 
 ```bash
-kubectl -n quiz get secret postgresql-auth -o jsonpath="{.data.postgres-password}" | base64 -d
+kubectl -n quiz get secret quizdb-auth -o jsonpath="{.data.postgres-password}" | base64 -d
 ```
 
 (On PowerShell without `base64`, use
-`[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((kubectl -n quiz get secret postgresql-auth -o jsonpath="{.data.postgres-password}")))`.)
+`[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((kubectl -n quiz get secret quizdb-auth -o jsonpath="{.data.postgres-password}")))`.)
 
 In pgAdmin choose Register > Server and fill in: host `quiz-postgres.tail5a1bc5.ts.net`, port `5432`, maintenance DB `postgres`,
 username `postgres`, and the password from above. Each service has its own database

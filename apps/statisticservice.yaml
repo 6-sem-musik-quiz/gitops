@@ -52,8 +52,8 @@ metadata:
   name: statisticservice
 spec:
   interval: 10m # how often Flux checks that the release matches Git
-  dependsOn: # deploy only after postgresql is ready
-    - name: postgresql
+  dependsOn: # deploy only after the database (quizdb) is ready
+    - name: quizdb
   chart:
     spec:
       chart: ./charts/quiz-service # our own chart, from this repo

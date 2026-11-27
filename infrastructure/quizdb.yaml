@@ -1,6 +1,7 @@
 # SCRUM-201: PostgreSQL scaled out on the X axis (AKF): one primary for reads and writes,
-# two read replicas that can only be read. Same databases and users as postgresql.yaml;
-# it replaces that release once the data is moved and the services point here.
+# two read replicas that can only be read. One database and one user per service that has a
+# database in the C4 design: UserDB, StatsDB and MusicDB. Every password lives in OpenBao at
+# kv/quiz/postgres: postgres-password, replication-password, userservice, musicservice, statisticservice.
 #   quizdb-postgresql-primary.quiz.svc.cluster.local:5432  read and write (all services)
 #   quizdb-postgresql-read.quiz.svc.cluster.local:5432     read only, spread over both replicas
 # Each pod has its own volume (no shared PVC), so a replica is a real copy: a new one
@@ -31,6 +32,33 @@ spec:
         key: quiz/postgres
         property: replication-password
 ---
+# The first-boot script: one user and one database per service.
+# It only runs when the volume is empty. To change it later, use psql.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: postgresql-initdb
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: SecretStore
+    name: openbao
+  target:
+    name: postgresql-initdb
+    template:
+      engineVersion: v2
+      data:
+        01-services.sql: |
+          CREATE USER userservice WITH PASSWORD '{{ .userservice }}';
+          CREATE DATABASE userservice OWNER userservice;
+          CREATE USER musicservice WITH PASSWORD '{{ .musicservice }}';
+          CREATE DATABASE musicservice OWNER musicservice;
+          CREATE USER statisticservice WITH PASSWORD '{{ .statisticservice }}';
+          CREATE DATABASE statisticservice OWNER statisticservice;
+  dataFrom:
+    - extract:
+        key: quiz/postgres
+---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -40,12 +68,12 @@ spec:
   chart:
     spec:
       chart: postgresql
-      version: "18.12.20"             # the same pinned chart as postgresql.yaml
+      version: "18.12.20"             # pinned: a new chart version is a deliberate change
       sourceRef:
         kind: HelmRepository
         name: bitnami
   values:
-    # The same PostgreSQL 18.7 image as postgresql.yaml, pinned by digest.
+    # Bitnami's PostgreSQL 18.7 image, pinned by digest: a digest always means the same image.
     image:
       registry: registry-1.docker.io
       repository: bitnami/postgresql
@@ -68,7 +96,7 @@ spec:
       numSynchronousReplicas: 1
     primary:
       initdb:
-        scriptsSecret: postgresql-initdb   # the same users and databases as postgresql.yaml
+        scriptsSecret: postgresql-initdb   # the first-boot SQL below: one user and database per service
       persistence:
         size: 2Gi
       resourcesPreset: none
@@ -89,3 +117,29 @@ spec:
           memory: 256Mi
         limits:
           memory: 512Mi
+---
+# Postgres on the tailnet, so pgAdmin/psql work without kubectl port-forward:
+#   quiz-postgres.tail5a1bc5.ts.net:5432
+# Only reachable over Tailscale. The homelab only allows class tailscale here.
+# Tailscale ACL: group:quiz -> tag:quiz-postgres tcp:5432 (set in the admin console).
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-tailnet
+  annotations:
+    tailscale.com/hostname: quiz-postgres
+    # Own tag, so the Tailscale ACL can give group:quiz tcp:5432 here and
+    # nothing else (tag:k8s is shared with Traefik and hello-api).
+    tailscale.com/tags: tag:quiz-postgres
+spec:
+  type: LoadBalancer
+  loadBalancerClass: tailscale         # the Tailscale operator makes the tailnet address
+  allocateLoadBalancerNodePorts: false # node ports are not allowed in quiz
+  selector:                            # the quizdb primary (read and write)
+    app.kubernetes.io/component: primary
+    app.kubernetes.io/instance: quizdb
+    app.kubernetes.io/name: postgresql
+  ports:
+    - name: tcp-postgresql
+      port: 5432
+      targetPort: tcp-postgresql
