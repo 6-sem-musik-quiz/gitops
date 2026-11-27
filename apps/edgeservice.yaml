@@ -5,6 +5,37 @@
 # /api/users/1. The edge's own endpoints are under /api/edge.
 # The routes live in the EdgeService repo (appsettings.json), not here.
 # Autoscaled by the chart's HPA (2-5 pods): the single entry point keeps one pod up during a rollout.
+#
+# SCRUM-174/175/194: the edge holds the maintenance flags ("design to be disabled") in Redis and
+# answers 503 for a switched-off service. It needs the Redis connection string and the JWT signing
+# key (kv/quiz/jwt, as the other services) for the admin endpoints. No dependsOn redis: the edge must
+# start without Redis, and the flags then fail open (every service on).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: edgeservice-secrets
+spec:
+  refreshInterval: 1h # read OpenBao again every hour
+  secretStoreRef: # where the values come from: OpenBao
+    kind: SecretStore
+    name: openbao
+  target:
+    name: edgeservice-secrets
+    template:
+      engineVersion: v2
+      data:
+        ConnectionStrings__Redis: "redis-master.quiz.svc.cluster.local:6379,password={{ .redisPassword }}"
+        Jwt__SigningKey: "{{ .jwtSigningKey }}"
+  data:
+    - secretKey: redisPassword
+      remoteRef:
+        key: quiz/redis
+        property: password
+    - secretKey: jwtSigningKey
+      remoteRef:
+        key: quiz/jwt
+        property: signing-key
+---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -22,3 +53,5 @@ spec:
     image:
       repository: ghcr.io/6-sem-musik-quiz/edgeservice
       tag: 25-a30b1832-1795782104 # {"$imagepolicy": "quiz:edgeservice:tag"}
+    envFromSecrets: # the Secret made by the ExternalSecret above
+      - edgeservice-secrets
